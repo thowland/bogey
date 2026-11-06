@@ -20,6 +20,7 @@
     "test:e2e": "playwright test",
     "gate": "pnpm lint && pnpm test:coverage && pnpm test:browsers && pnpm build && pnpm test:e2e",
     "fixtures:make": "node tooling/scripts/make-fixtures.ts",
+    "demo:export": "node tooling/scripts/demo-export.ts",
     "fixtures:fetch": "scripts/fetch-fixtures.sh",
     "infra:deploy": "scripts/infra-deploy.sh",
     "deploy:site": "scripts/deploy.sh"
