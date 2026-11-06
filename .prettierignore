@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+docs/
+out/
+tooling/fixtures/
+# Fixture PDFs and their manifest are generated or vendored byte-exact.
+fixtures/
+.claude/

@@ -1,0 +1,69 @@
+# The same gate that every merge passes locally (CLAUDE.md, implementation plan §1.2): lint,
+# unit and browser tests with coverage, Firefox and WebKit runs, build, and end-to-end tests
+# against the production build with the production headers. Actions are pinned to commit SHAs.
+# Dormant until the repository has a remote (implementation plan §1.1).
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install browsers and qpdf
+        run: |
+          pnpm exec playwright install --with-deps chromium firefox webkit
+          sudo apt-get install -y qpdf
+
+      - name: Cache fetched fixtures
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fixtures/fetched
+          key: fixtures-${{ hashFiles('scripts/fetch-fixtures.sh') }}
+
+      - name: Fetch fixtures
+        run: pnpm fixtures:fetch
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+
+      - name: Gate
+        env:
+          CI: 'true'
+        run: pnpm gate
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14

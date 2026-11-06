@@ -1,0 +1,7 @@
+.failed {
+  display: grid;
+  place-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  text-align: center;
+}

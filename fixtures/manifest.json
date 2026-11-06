@@ -1,0 +1,440 @@
+[
+  {
+    "path": "fixtures/vendored/generated/acroform-all-aes256.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "f109d1e35095b551870b713e9bc7b1baf50fe5f523954ed45545769d4656477e",
+    "committed": true,
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "bogey",
+    "cipher": "AES-256",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Password-protected copy of acroform-all (user password \"bogey\")",
+    "fieldKinds": [
+      "text",
+      "checkbox",
+      "radio",
+      "dropdown",
+      "list",
+      "button"
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/acroform-all.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "9b903512d34519d14dc5cfa8a00176e8e3025974854b3381d2fe087da3d24bcc",
+    "committed": true,
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "One of every field type, named predictably (F1, F4, F5)",
+    "fieldKinds": [
+      "text",
+      "checkbox",
+      "radio",
+      "dropdown",
+      "list",
+      "button"
+    ],
+    "features": [
+      "comb",
+      "max-length",
+      "multiline",
+      "read-only",
+      "multiselect"
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/cropbox-offset-rotate-90.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "c209387d69aec455cef563fd5597b77bf78eefe7c9eb276fad59914cc3e105c6",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      90
+    ],
+    "cropOrigin": true,
+    "pageCount": 1,
+    "purpose": "Crop box offset combined with rotation (X3)",
+    "marks": [
+      {
+        "page": 0,
+        "x": 150,
+        "y": 180
+      },
+      {
+        "page": 0,
+        "x": 356,
+        "y": 476
+      },
+      {
+        "page": 0,
+        "x": 550,
+        "y": 780
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/cropbox-offset.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "5b81db4f96281fcfbf6a7f8e4eb4be2b2928a74d313abba9c534128b27f47e9f",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": true,
+    "pageCount": 1,
+    "purpose": "Non-zero crop box origin (X3, X5)",
+    "marks": [
+      {
+        "page": 0,
+        "x": 150,
+        "y": 180
+      },
+      {
+        "page": 0,
+        "x": 356,
+        "y": 476
+      },
+      {
+        "page": 0,
+        "x": 550,
+        "y": 780
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/flat-single.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "d661dcbcca32c08206a9f669f4ac9c7e2df6bc33ce42a5b24d1212c114ccba8f",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Flat single page with drawn boxes and registration marks",
+    "marks": [
+      {
+        "page": 0,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 0,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 0,
+        "x": 500,
+        "y": 700
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/large-20p.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "26b8e77d7a7eb229d0cef65a330b5a19f263affeb29538639e74b8b85b3f78aa",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 20,
+    "purpose": "20 pages, about 10 MB, embedded images (E7, V6)",
+    "bytes": 10097041
+  },
+  {
+    "path": "fixtures/vendored/generated/multipage-rotations.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "ba57d9f2280eaf81a39e47c8f1b81c5efc00becea275eb600e01e60aa7fefbd9",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0,
+      90,
+      180,
+      270
+    ],
+    "cropOrigin": false,
+    "pageCount": 4,
+    "purpose": "Flat multi-page, one page per rotation (V5)",
+    "marks": [
+      {
+        "page": 0,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 0,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 0,
+        "x": 500,
+        "y": 700
+      },
+      {
+        "page": 1,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 1,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 1,
+        "x": 500,
+        "y": 700
+      },
+      {
+        "page": 2,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 2,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 2,
+        "x": 500,
+        "y": 700
+      },
+      {
+        "page": 3,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 3,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 3,
+        "x": 500,
+        "y": 700
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/rotate-0.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "f52435b45644f8387c44cc11109ee6141ec330619ca0faca542734b39745294b",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Registration marks on a page with /Rotate 0 (X5)",
+    "marks": [
+      {
+        "page": 0,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 0,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 0,
+        "x": 500,
+        "y": 700
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/rotate-180.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "983da6feaf01631c8ebafc6b8e60919fec24f841b1747be2d80ba7ce00775ad3",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      180
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Registration marks on a page with /Rotate 180 (X5)",
+    "marks": [
+      {
+        "page": 0,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 0,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 0,
+        "x": 500,
+        "y": 700
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/rotate-270.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "21e502833036a399ad5c6089e74a4b2c8009e50d7c07144ecd5d9d06f5f36306",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      270
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Registration marks on a page with /Rotate 270 (X5)",
+    "marks": [
+      {
+        "page": 0,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 0,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 0,
+        "x": 500,
+        "y": 700
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/rotate-90.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "160c2cc35575511354c001694cdebc030caf8d04c4959631d6a60a6ccab36008",
+    "committed": true,
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      90
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Registration marks on a page with /Rotate 90 (X5)",
+    "marks": [
+      {
+        "page": 0,
+        "x": 100,
+        "y": 100
+      },
+      {
+        "page": 0,
+        "x": 306,
+        "y": 396
+      },
+      {
+        "page": 0,
+        "x": 500,
+        "y": 700
+      }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/xfa-dynamic.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "9f0f54240a9bdbde5ac554a4a67dae015aa38e351404a76972242f9d40aa7b1d",
+    "committed": true,
+    "formType": "xfa",
+    "xfa": "dynamic",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Dynamic XFA placeholder page (D4 dynamic)"
+  },
+  {
+    "path": "fixtures/vendored/generated/xfa-hybrid.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "9f436810264d9b9019fa9c071ae3c59de1d36b4f31c08a5e3884982df65459d1",
+    "committed": true,
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "XFA with a complete AcroForm fallback (D4 hybrid)",
+    "fieldKinds": [
+      "text",
+      "checkbox",
+      "radio",
+      "dropdown",
+      "list",
+      "button"
+    ]
+  }
+]

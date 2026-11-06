@@ -38,3 +38,7 @@ Thumbs.db
 
 # Local deploy settings (deploy.env.example is the template)
 deploy.env
+
+# Lockfiles are committed here, overriding the global ignore
+!package-lock.json
+!pnpm-lock.yaml
