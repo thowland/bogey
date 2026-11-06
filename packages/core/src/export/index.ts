@@ -67,7 +67,11 @@ export function preflightExport(
 const labelOf = (field: FieldDescriptor, value: string) =>
   field.options?.find((o) => o.value === value)?.label ?? value;
 
-type StageListener = (stage: ExportStage) => void;
+/**
+ * Progress callback (E7). A returned promise is awaited, so a listener in another thread (a
+ * comlink proxy) has received every stage before the export resolves.
+ */
+export type StageListener = (stage: ExportStage) => unknown;
 
 function setMetadata(doc: PDFDocument, now: number, info?: PdfInfo['metadata']) {
   if (info?.title !== undefined) doc.setTitle(info.title);
@@ -93,10 +97,10 @@ async function save(
   stage: StageListener,
   rasterized: boolean,
 ): Promise<Result<ExportOutput, ExportProblem>> {
-  stage('saving');
+  await stage('saving');
   removeEncryptionLeftovers(doc);
   const bytes = await doc.save({ useObjectStreams: true, updateFieldAppearances: false });
-  stage('checking');
+  await stage('checking');
   if (!(await verify(bytes, pageCount))) return fail({ code: 'export.verify-failed' });
   return ok({ bytes, rasterized });
 }
@@ -119,7 +123,7 @@ export async function exportPdf(
   try {
     const text = textPolicy(input);
     if (!text.ok) return text;
-    onStage('loading');
+    await onStage('loading');
     const loaded = await loadPdf(input.bytes, {
       ...(input.password !== undefined ? { password: input.password } : {}),
       preserveXFA: true,
@@ -137,7 +141,7 @@ export async function exportPdf(
     if (!decryptable || !input.info.decryptable) return fail({ code: 'export.cannot-decrypt' });
     const pageCount = doc.getPageCount();
 
-    onStage('fields');
+    await onStage('fields');
     // Hybrid XFA (spec §6.2): the XFA layer goes, so readers show the filled AcroForm. A dynamic
     // form's XFA goes too: the export shows what Bogey showed, the flat pages with overlays.
     if (hasXfa(doc)) doc.getForm().deleteXFA();
@@ -151,7 +155,7 @@ export async function exportPdf(
       text.value,
     );
 
-    onStage('drawing');
+    await onStage('drawing');
     const drawn = await drawOverlays(input.state.overlays, {
       doc,
       pages: doc.getPages(),
@@ -198,7 +202,7 @@ export async function exportPageImages(
     }
     const text = textPolicy({ ...input, info: { ...input.info, fields: [] } });
     if (!text.ok) return text;
-    onStage('loading');
+    await onStage('loading');
     const doc = await PDFDocument.create({ updateMetadata: false });
     for (const [i, geometry] of input.info.pages.entries()) {
       const [x0, y0, x1, y1] = geometry.view;
@@ -210,7 +214,7 @@ export async function exportPageImages(
       const image = await doc.embedJpg(input.pages[i]!.jpeg);
       page.drawImage(image, { x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
     }
-    onStage('drawing');
+    await onStage('drawing');
     const drawn = await drawOverlays(input.state.overlays, {
       doc,
       pages: doc.getPages(),

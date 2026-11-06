@@ -5,7 +5,7 @@
 import type { Overlay, PageGeometry } from '@bogey/core';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { commands } from 'vitest/browser';
 import { createPdfWorkerBridge, pdfBridge, spawnPdfWorker } from '../src/core-bridge/pdf.ts';
 
@@ -140,10 +140,8 @@ describe('pdf worker', () => {
       (s) => stages.push(s),
     );
     expect(out.ok).toBe(true);
-    // Stage callbacks travel on their own comlink channel, so the last may land after the result.
-    await vi.waitFor(() =>
-      expect(stages).toEqual(['loading', 'fields', 'drawing', 'saving', 'checking']),
-    );
+    // The worker awaits each stage callback, so all have arrived when the export resolves.
+    expect(stages).toEqual(['loading', 'fields', 'drawing', 'saving', 'checking']);
     bridge.dispose();
     expect(pdfBridge()).not.toBeNull();
   });

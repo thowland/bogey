@@ -12,7 +12,12 @@ const BROWSER_API = { port: ports().vitest, strictPort: false };
 // them partway through a run on a cold cache, re-optimizes and reloads the page, which loads React
 // twice and fails test imports; the gate on master after a merge always starts cold for new
 // imports. Add a package here when a browser test (or code it loads) starts importing it.
-const CORE_BROWSER_DEPS = ['@cantoo/pdf-lib', 'zod', 'fast-check'];
+const CORE_BROWSER_DEPS = [
+  '@cantoo/pdf-lib',
+  '@cantoo/pdf-lib/standard-fonts',
+  'zod',
+  'fast-check',
+];
 const WEB_BROWSER_DEPS = [
   'react',
   'react/jsx-dev-runtime',
@@ -30,6 +35,7 @@ const WEB_BROWSER_DEPS = [
   '@testing-library/user-event',
   'fast-check',
   '@bogey/core > @cantoo/pdf-lib',
+  '@bogey/core > @cantoo/pdf-lib/standard-fonts',
   '@bogey/core > zod',
 ];
 
