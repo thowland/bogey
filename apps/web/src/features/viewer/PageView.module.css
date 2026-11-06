@@ -1,0 +1,45 @@
+/* The page area scrolls in both directions; one finger pans and pinch is left to the app (V4,
+   spec §10.4). The gutter is PAGE_GUTTER in zoom.ts. */
+.area {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+  scrollbar-gutter: stable;
+  touch-action: pan-x pan-y;
+  background: var(--surface-sunken);
+}
+
+.sheet {
+  position: relative;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: var(--page-shadow);
+}
+
+.sheet[hidden] {
+  display: none;
+}
+
+.canvasHost {
+  position: absolute;
+  inset: 0;
+}
+
+/* Stretched to the sheet, so a render at the previous zoom scales until the new one arrives. */
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-5);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--failure-text);
+}

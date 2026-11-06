@@ -1,5 +1,8 @@
-// The empty state (U5): drop zone, recent documents, and the privacy statement.
+// The empty state (U5): drop zone, recent documents, and the privacy statement. The password
+// dialog lives here too, since a document that needs one is not open yet.
 import { useViewStore } from '../../state/view.ts';
+import { DropZone } from './DropZone.tsx';
+import { PasswordDialog } from './PasswordDialog.tsx';
 import { RecentDocuments } from './RecentDocuments.tsx';
 import styles from './EmptyState.module.css';
 
@@ -7,10 +10,8 @@ export function EmptyState() {
   const setScreen = useViewStore((state) => state.setScreen);
   return (
     <div className={styles.empty}>
-      <section className={styles.drop} aria-label="Open a PDF">
-        <p className={styles.dropTitle}>Drop a PDF here to fill and sign it</p>
-        <p className={styles.dropHint}>Opening files arrives in the next build.</p>
-      </section>
+      <DropZone />
+      <PasswordDialog />
       <section className={styles.recent} aria-labelledby="recent-heading">
         <h2 id="recent-heading">Recent documents</h2>
         <RecentDocuments />
