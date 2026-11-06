@@ -8,3 +8,25 @@ export * from './model/document.ts';
 export type * from './model/export.ts';
 export * from './model/library.ts';
 export * from './model/text.ts';
+// Sprint 2: PDF core.
+export * from './geometry/index.ts';
+export {
+  classify,
+  hasPdfHeader,
+  inspectPdf,
+  readPageGeometry,
+  type InspectProblem,
+} from './inspect/index.ts';
+export * from './history/index.ts';
+export * from './text/index.ts';
+export {
+  CHECK_GLYPH,
+  PRODUCER,
+  X_MARK,
+  exportPageImages,
+  exportPdf,
+  preflightExport,
+  type ExportPageImagesInput,
+  type PageImage,
+} from './export/index.ts';
+export { outputFileName } from './naming.ts';
