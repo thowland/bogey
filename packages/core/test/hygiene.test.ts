@@ -408,3 +408,54 @@ describe('stripActiveContent at scale', () => {
     expect(a === undefined || chainSatisfies(doc.context, a, isSafeAction)).toBe(true);
   });
 });
+
+describe('stripActiveContent bounds', () => {
+  it('collapses a diamond DAG of unsafe actions instead of growing exponentially', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage();
+    const ctx = doc.context;
+    let level: PDFRef[] = [
+      ctx.register(ctx.obj({ S: 'URI', URI: PDFString.of('https://example.com/end') })),
+    ];
+    for (let i = 0; i < 30; i++) {
+      const next = ctx.obj(level.length === 1 ? [level[0]!, level[0]!] : level);
+      level = [0, 1].map(() =>
+        ctx.register(ctx.obj({ S: 'JavaScript', JS: PDFString.of('x'), Next: next })),
+      );
+    }
+    const top = ctx.register(
+      ctx.obj({ S: 'JavaScript', JS: PDFString.of('top'), Next: ctx.obj(level) }),
+    );
+    const link = ctx.register(
+      ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 1, 1], A: top }),
+    );
+    page.node.addAnnot(link);
+    const start = performance.now();
+    stripActiveContent(doc);
+    expect(performance.now() - start).toBeLessThan(1_000);
+    const a = doc.context.lookup(link, PDFDict).get(N('A'));
+    expect(sOf(doc, a)).toBe('/URI');
+    expect(doc.context.lookup(a!, PDFDict).get(N('Next'))).toBeUndefined();
+  });
+
+  it('leaves nothing for a /Next wider or a chain deeper than the cap', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage();
+    const ctx = doc.context;
+    const uri = () => ctx.register(ctx.obj({ S: 'URI', URI: PDFString.of('https://example.com') }));
+    const wide = ctx.obj({ S: 'JavaScript', Next: ctx.obj(Array.from({ length: 300 }, uri)) });
+    let deep: PDFRef = uri();
+    for (let i = 0; i < 300; i++) deep = ctx.register(ctx.obj({ S: 'GoTo', Next: deep }));
+    const links = [wide, deep].map((A) =>
+      ctx.register(ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 1, 1], A })),
+    );
+    for (const l of links) page.node.addAnnot(l);
+    stripActiveContent(doc);
+    expect(doc.context.lookup(links[0]!, PDFDict).get(N('A'))).toBeUndefined();
+    const deepKept = doc.context.lookup(links[1]!, PDFDict).get(N('A'));
+    // The over-deep tail is cut, so whatever remains is within the cap.
+    expect(deepKept === undefined || chainSatisfies(doc.context, deepKept, isSafeAction)).toBe(
+      true,
+    );
+  });
+});

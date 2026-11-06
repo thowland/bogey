@@ -94,6 +94,20 @@ export const CLONE_BUDGET = 10_000;
 const sameEntries = (a: readonly PDFObject[], b: readonly PDFObject[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
 
+/** A cleaned chain: the actions left in place, and the longest chain among them. */
+interface Cleaned {
+  readonly list: readonly PDFObject[];
+  readonly height: number;
+}
+
+const NOTHING: Cleaned = Object.freeze({ list: Object.freeze([]), height: 0 });
+
+/** Deduplicated (first occurrence wins), or null when longer than MAX_CHAIN (fail closed). */
+function bounded(list: readonly PDFObject[]): PDFObject[] | null {
+  const out = [...new Set(list)];
+  return out.length > MAX_CHAIN ? null : out;
+}
+
 /**
  * Cleans action chains for one export. Results are memoized per (policy, action dictionary), so a
  * shared action or chain suffix is cleaned once per policy and every slot reuses the result:
@@ -103,10 +117,9 @@ const sameEntries = (a: readonly PDFObject[], b: readonly PDFObject[]) =>
  */
 class ActionCleaner {
   cloned = 0;
-  private readonly chains = new Map<ActionPolicy, Map<PDFDict, PDFObject[]>>();
+  private readonly chains = new Map<ActionPolicy, Map<PDFDict, Cleaned>>();
   private readonly slots = new Map<ActionPolicy, Map<PDFDict, PDFObject | null>>();
   private readonly inProgress = new Set<PDFDict>();
-
   private readonly ctx: PDFContext;
   private readonly budget: number;
 
@@ -135,25 +148,34 @@ class ActionCleaner {
   /**
    * The actions that remain in place of `raw`, in order: the action itself (or a copy with a
    * cleaned `/Next`) when the policy allows it, otherwise its cleaned successors spliced in.
-   * A cycle is cut where it closes; chains deeper than MAX_CHAIN are cut there.
+   * Bounded and fail closed: a cycle is cut where it closes; lists are deduplicated; a list longer
+   * than MAX_CHAIN, a `/Next` wider than that, or a chain that would run deeper than MAX_CHAIN
+   * from here leaves nothing.
    */
-  chain(raw: PDFObject, policy: ActionPolicy, depth = 0): PDFObject[] {
+  chain(raw: PDFObject, policy: ActionPolicy, depth = 0): Cleaned {
     const dict = this.ctx.lookup(raw);
-    if (!(dict instanceof PDFDict)) return [];
+    if (!(dict instanceof PDFDict)) return NOTHING;
     const memo = this.memo(this.chains, policy);
     const hit = memo.get(dict);
-    if (hit) return hit;
-    if (this.inProgress.has(dict) || depth >= MAX_CHAIN) return [];
-    this.inProgress.add(dict);
+    if (hit) return depth + hit.height > MAX_CHAIN ? NOTHING : hit;
+    if (this.inProgress.has(dict) || depth >= MAX_CHAIN) return NOTHING;
     const original = nextEntries(this.ctx, dict);
-    const next = original.flatMap((entry) => this.chain(entry, policy, depth + 1));
-    this.inProgress.delete(dict);
-    let result: PDFObject[];
-    if (!policy(dict)) result = next;
-    else if (sameEntries(original, next)) result = [raw];
-    else {
-      const copy = this.copyWithNext(dict, next);
-      result = copy ? [copy] : [];
+    let result: Cleaned;
+    if (original.length > MAX_CHAIN) {
+      result = NOTHING;
+    } else {
+      this.inProgress.add(dict);
+      const children = original.map((entry) => this.chain(entry, policy, depth + 1));
+      this.inProgress.delete(dict);
+      const next = bounded(children.flatMap((c) => c.list));
+      const below = Math.max(0, ...children.map((c) => c.height));
+      if (next === null) result = NOTHING;
+      else if (!policy(dict)) result = { list: next, height: below };
+      else if (sameEntries(original, next)) result = { list: [raw], height: below + 1 };
+      else {
+        const copy = this.copyWithNext(dict, next);
+        result = copy ? { list: [copy], height: below + 1 } : NOTHING;
+      }
     }
     memo.set(dict, result);
     return result;
@@ -165,12 +187,13 @@ class ActionCleaner {
     if (!(dict instanceof PDFDict)) return null;
     const memo = this.memo(this.slots, policy);
     if (memo.has(dict)) return memo.get(dict)!;
-    const [head, ...rest] = this.chain(raw, policy);
+    const [head, ...rest] = this.chain(raw, policy).list;
     let result: PDFObject | null = head ?? null;
     if (head !== undefined && rest.length > 0) {
       // Several survivors: the first runs, then its own successors, then the others.
       const headDict = this.ctx.lookup(head) as PDFDict;
-      result = this.copyWithNext(headDict, [...nextEntries(this.ctx, headDict), ...rest]);
+      const combined = bounded([...nextEntries(this.ctx, headDict), ...rest]);
+      result = combined === null ? null : this.copyWithNext(headDict, combined);
     }
     memo.set(dict, result);
     return result;
@@ -201,7 +224,9 @@ export function chainSatisfies(ctx: PDFContext, raw: PDFObject, safe: ActionPoli
     if (seen.has(dict)) continue;
     if (seen.size >= MAX_CHAIN || !safe(dict)) return false;
     seen.add(dict);
-    pending.push(...nextEntries(ctx, dict));
+    const next = nextEntries(ctx, dict);
+    if (pending.length + next.length > MAX_CHAIN) return false;
+    pending.push(...next);
   }
   return true;
 }
