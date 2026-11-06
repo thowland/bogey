@@ -52,8 +52,11 @@ const newId = () => crypto.randomUUID();
 const repository = () => useStorageStore.getState().repository;
 
 /** Writes the records that differ from `before` and deletes the ones that are gone. */
-async function save(before: readonly Snippet[], after: readonly Snippet[]): Promise<void> {
-  const repo = repository();
+async function save(
+  before: readonly Snippet[],
+  after: readonly Snippet[],
+  repo: Repository | null = repository(),
+): Promise<void> {
   if (!repo) return;
   const old = new Map(before.map((item) => [item.id, item]));
   const changed = after.filter((item) => old.get(item.id) !== item);
@@ -118,7 +121,7 @@ export const useSnippetsStore = create<SnippetsState & SnippetsActions>()((set, 
       const items = numbered(stored);
       set({ items, loaded: true });
       // Repair orders with gaps or ties, so the stored order is the shown order.
-      await save(stored, items);
+      await save(stored, items, repo);
     },
 
     add: async (label = '') => {

@@ -23,7 +23,15 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useEffect, useId, useRef, useState, type ChangeEvent, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type PointerEvent,
+} from 'react';
 import { SNIPPET_LIMITS } from '../../core-bridge/snippets.ts';
 import { useDocumentStore } from '../../state/document.ts';
 import { useEditsStore } from '../../state/edits.ts';
@@ -193,11 +201,14 @@ function UseList({ items, onResult }: { items: readonly Snippet[]; onResult(text
             type="button"
             className={styles.snippet}
             disabled={!ready}
+            aria-labelledby={`${hintId}-today-label`}
             aria-describedby={`${hintId}-today`}
             onPointerDown={keepFocus}
             onClick={() => use(today, 'Today', true)}
           >
-            <span className={styles.label}>Today</span>
+            <span id={`${hintId}-today-label`} className={styles.label}>
+              Today
+            </span>
             <span id={`${hintId}-today`} className={styles.value} data-format={dateFormat}>
               {today}
             </span>
@@ -212,11 +223,14 @@ function UseList({ items, onResult }: { items: readonly Snippet[]; onResult(text
                 type="button"
                 className={styles.snippet}
                 disabled={!ready || empty}
+                aria-labelledby={`${hintId}-${item.id}-label`}
                 aria-describedby={`${hintId}-${item.id}`}
                 onPointerDown={keepFocus}
                 onClick={() => use(item.value, label)}
               >
-                <span className={styles.label}>{label}</span>
+                <span id={`${hintId}-${item.id}-label`} className={styles.label}>
+                  {label}
+                </span>
                 <span id={`${hintId}-${item.id}`} className={styles.value}>
                   {empty ? 'Empty. Choose Edit snippets to fill it in.' : item.value}
                 </span>
@@ -226,7 +240,9 @@ function UseList({ items, onResult }: { items: readonly Snippet[]; onResult(text
         })}
       </ul>
       {items.length === 0 && (
-        <p className={styles.hint}>Choose Edit snippets to add the details you type often.</p>
+        <p className={styles.hint}>
+          Choose Edit snippets to add the details you reuse, such as your name and address.
+        </p>
       )}
     </>
   );
@@ -241,6 +257,7 @@ function EditList({ items }: { items: readonly Snippet[] }) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const ids = items.map((item) => item.id);
+  const spoken = useMemo(() => announcements(items), [items]);
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
@@ -261,7 +278,7 @@ function EditList({ items }: { items: readonly Snippet[] }) {
         collisionDetection={closestCenter}
         onDragEnd={onDragEnd}
         accessibility={{
-          announcements: announcements(items),
+          announcements: spoken,
           screenReaderInstructions: {
             draggable:
               'To move this snippet, press Space or Enter, use the up and down arrow keys to choose its new place, and press Space or Enter again to drop it. Press Escape to cancel.',
@@ -286,18 +303,28 @@ function EditList({ items }: { items: readonly Snippet[] }) {
   );
 }
 
-/** Screen reader announcements for reordering (spec §13). */
+/**
+ * Screen reader announcements for reordering (spec §13). dnd-kit reports the row under the
+ * snippet as soon as it is picked up, which is its own place; that is not announced, so it does
+ * not replace "Picked up".
+ */
 export function announcements(items: readonly Snippet[]): Announcements {
   const n = items.length;
+  let lastOver: UniqueIdentifier | null = null;
   const name = (id: UniqueIdentifier) =>
     items.find((item) => item.id === id)?.label.trim() || 'Untitled';
   const place = (id: UniqueIdentifier | undefined) =>
     id === undefined ? -1 : items.findIndex((item) => item.id === id) + 1;
   return {
-    onDragStart: ({ active }) =>
-      `Picked up ${name(active.id)}. It is in position ${place(active.id)} of ${n}.`,
-    onDragOver: ({ active, over }) =>
-      over ? `${name(active.id)} moved to position ${place(over.id)} of ${n}.` : undefined,
+    onDragStart: ({ active }) => {
+      lastOver = active.id;
+      return `Picked up ${name(active.id)}. It is in position ${place(active.id)} of ${n}.`;
+    },
+    onDragOver: ({ active, over }) => {
+      if (!over || over.id === lastOver) return undefined;
+      lastOver = over.id;
+      return `${name(active.id)} moved to position ${place(over.id)} of ${n}.`;
+    },
     onDragEnd: ({ active, over }) =>
       over
         ? `${name(active.id)} dropped in position ${place(over.id)} of ${n}.`
