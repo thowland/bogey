@@ -2,9 +2,41 @@
 // field type, tab in document order and across pages, use the Fields panel, and see the XFA
 // notices. The violation fixture is active, so these tests take no screenshots.
 import { existsSync } from 'node:fs';
-import { expect, fieldLayer, fieldsPanel, openFixture, renderedPage, test } from './helpers.ts';
+import type { Locator, Page } from '@playwright/test';
+import {
+  expect,
+  exportInNode,
+  fieldLayer,
+  fieldsPanel,
+  inkInBox,
+  openFixture,
+  readFlattened,
+  renderedPage,
+  test,
+} from './helpers.ts';
 
 const fetched = (path: string) => existsSync(new URL(`../fixtures/${path}`, import.meta.url));
+
+const selected = (list: Locator) =>
+  list.evaluate((el: HTMLSelectElement) => [...el.selectedOptions].map((o) => o.value));
+
+/** Opens exported bytes in the app, as a user would open the downloaded copy. */
+async function openExport(page: Page, bytes: Uint8Array) {
+  await page.getByTestId('open-input').setInputFiles({
+    name: 'export.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from(bytes),
+  });
+  await expect(page.getByRole('region', { name: /^Page 1 of / })).toBeVisible();
+  await renderedPage(page, 1);
+}
+
+// The center of a checkbox: the box's own border is page content, the check is not.
+const inner = ([x0, y0, x1, y1]: number[]): [number, number, number, number] => {
+  const dx = (x1! - x0!) / 4;
+  const dy = (y1! - y0!) / 4;
+  return [x0! + dx, y0! + dy, x1! - dx, y1! - dy];
+};
 
 test('every field type fills, and the Fields panel shows the values @all-engines', async ({
   page,
@@ -154,4 +186,87 @@ test('a hybrid XFA form fills its AcroForm fields @all-engines', async ({ page }
   await expect(
     panel.getByRole('button', { name: 'text1, Text, page 1: Hybrid works' }),
   ).toBeVisible();
+});
+
+// Interim export check: Sprint 4's export dialog is not on master yet, so the values the app's
+// controls hold are exported through core in Node, exactly as the pdf worker does. The combined
+// MVP scenario through the real download replaces this once both sprints have merged.
+test('the filled values export flattened', async ({ page }) => {
+  await page.goto('/');
+  await openFixture(page, 'vendored/generated/acroform-all.pdf');
+  await renderedPage(page, 1);
+  const layer = fieldLayer(page);
+  await layer.getByRole('textbox', { name: 'text1' }).fill('Ada Lovelace');
+  await layer.getByRole('textbox', { name: 'multiline1' }).fill('First line');
+  await layer.getByRole('textbox', { name: 'comb1' }).fill('123456789');
+  await layer.getByRole('checkbox', { name: 'check1' }).check();
+  await layer.getByRole('radio', { name: 'radio1: c' }).check();
+  await layer.getByRole('combobox', { name: 'dropdown1' }).selectOption('Gamma');
+  await layer.getByRole('listbox', { name: 'list1' }).selectOption(['One', 'Three']);
+
+  const values = {
+    text1: await layer.getByRole('textbox', { name: 'text1' }).inputValue(),
+    multiline1: await layer.getByRole('textbox', { name: 'multiline1' }).inputValue(),
+    comb1: await layer.getByRole('textbox', { name: 'comb1' }).inputValue(),
+    check1: await layer.getByRole('checkbox', { name: 'check1' }).isChecked(),
+    radio1: (await layer.getByRole('radio', { name: 'radio1: c' }).isChecked()) ? 'c' : '',
+    dropdown1: await layer.getByRole('combobox', { name: 'dropdown1' }).inputValue(),
+    list1: await selected(layer.getByRole('listbox', { name: 'list1' })),
+  };
+  expect(values).toEqual({
+    text1: 'Ada Lovelace',
+    multiline1: 'First line',
+    comb1: '123456789',
+    check1: true,
+    radio1: 'c',
+    dropdown1: 'Gamma',
+    list1: ['One', 'Three'],
+  });
+
+  const bytes = await exportInNode('vendored/generated/acroform-all.pdf', values);
+  const out = await readFlattened(bytes);
+  expect(out.fields).toBe(0);
+  for (const text of ['Ada Lovelace', 'First line', 'Gamma', 'Fixed value']) {
+    expect(out.draws(text), text).toBe(true);
+  }
+  await openExport(page, bytes);
+  await expect(fieldLayer(page)).toHaveCount(0);
+  expect(await inkInBox(page, 1, inner([180, 498, 195, 513]), 792)).toBeGreaterThan(0.05);
+});
+
+test('the W-9 exports Other and 3b checked', async ({ page }) => {
+  test.skip(!fetched('fetched/irs/fw9.pdf'), 'run pnpm fixtures:fetch');
+  await page.goto('/');
+  await openFixture(page, 'fetched/irs/fw9.pdf');
+  await renderedPage(page, 1);
+  const layer = fieldLayer(page);
+  const other = 'topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[6]';
+  const b3 = 'topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_2[0]';
+  const ssn = 'topmostSubform[0].Page1[0].f1_13[0]';
+  await layer.getByRole('checkbox', { name: 'c1_1[6]' }).check();
+  await layer.getByRole('checkbox', { name: 'c1_2[0]' }).check();
+  await layer.getByRole('textbox', { name: 'f1_13[0]' }).fill('6789');
+  await layer.getByRole('textbox', { name: 'f1_01[0]' }).fill('Tim Howland');
+  const values = {
+    [other]: await layer.getByRole('checkbox', { name: 'c1_1[6]' }).isChecked(),
+    [b3]: await layer.getByRole('checkbox', { name: 'c1_2[0]' }).isChecked(),
+    [ssn]: await layer.getByRole('textbox', { name: 'f1_13[0]' }).inputValue(),
+    'topmostSubform[0].Page1[0].f1_01[0]': await layer
+      .getByRole('textbox', { name: 'f1_01[0]' })
+      .inputValue(),
+  };
+  expect(values[other]).toBe(true);
+  expect(values[b3]).toBe(true);
+
+  const bytes = await exportInNode('fetched/irs/fw9.pdf', values);
+  const out = await readFlattened(bytes);
+  expect(out.fields).toBe(0);
+  expect(out.draws('Tim Howland')).toBe(true);
+  await openExport(page, bytes);
+  const height = 791.968;
+  const otherInk = await inkInBox(page, 1, inner([73, 554, 81, 562]), height);
+  const b3Ink = await inkInBox(page, 1, inner([441, 521, 449, 529]), height);
+  const individualInk = await inkInBox(page, 1, inner([73, 604, 81, 612]), height);
+  expect(otherInk).toBeGreaterThan(individualInk + 0.05);
+  expect(b3Ink).toBeGreaterThan(individualInk + 0.05);
 });
