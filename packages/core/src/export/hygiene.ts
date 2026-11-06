@@ -88,44 +88,107 @@ function setNext(dict: PDFDict, entries: PDFObject[], ctx: PDFContext) {
   else dict.set(N('Next'), ctx.obj(entries));
 }
 
+/** Clones of action dictionaries one export may make before it drops actions instead. */
+export const CLONE_BUDGET = 10_000;
+
+const sameEntries = (a: readonly PDFObject[], b: readonly PDFObject[]) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
+
 /**
- * Cleans one action and its `/Next` chain. Returns the actions that remain in its place, in
- * order: a fresh copy of the action when the policy allows it, otherwise its cleaned successors
- * spliced in. Copies (copy on write) mean that cleaning one slot under one policy never rewires
- * an action dictionary another slot shares. Cycles are cut at the first repeated action.
+ * Cleans action chains for one export. Results are memoized per (policy, action dictionary), so a
+ * shared action or chain suffix is cleaned once per policy and every slot reuses the result:
+ * the work is linear in distinct objects. A kept action is copied only when its `/Next` changes
+ * (copy on write, so cleaning one slot never rewires a dictionary another slot shares), and
+ * copies are capped by a global budget; past it, actions are dropped (fail closed).
  */
-function cleanChain(
-  ctx: PDFContext,
-  raw: PDFObject,
-  safe: ActionPolicy,
-  visited: Set<PDFDict>,
-): PDFObject[] {
-  const dict = ctx.lookup(raw);
-  if (!(dict instanceof PDFDict) || visited.has(dict) || visited.size >= MAX_CHAIN) return [];
-  visited.add(dict);
-  const next = nextEntries(ctx, dict).flatMap((entry) => cleanChain(ctx, entry, safe, visited));
-  if (!safe(dict)) return next;
-  const copy = dict.clone(ctx);
-  setNext(copy, next, ctx);
-  return [ctx.register(copy)];
+class ActionCleaner {
+  cloned = 0;
+  private readonly chains = new Map<ActionPolicy, Map<PDFDict, PDFObject[]>>();
+  private readonly slots = new Map<ActionPolicy, Map<PDFDict, PDFObject | null>>();
+  private readonly inProgress = new Set<PDFDict>();
+
+  private readonly ctx: PDFContext;
+  private readonly budget: number;
+
+  constructor(ctx: PDFContext, budget: number) {
+    this.ctx = ctx;
+    this.budget = budget;
+  }
+
+  private memo<V>(maps: Map<ActionPolicy, Map<PDFDict, V>>, policy: ActionPolicy) {
+    let map = maps.get(policy);
+    if (!map) {
+      map = new Map();
+      maps.set(policy, map);
+    }
+    return map;
+  }
+
+  private copyWithNext(dict: PDFDict, next: PDFObject[]): PDFObject | null {
+    if (this.cloned >= this.budget) return null;
+    this.cloned++;
+    const copy = dict.clone(this.ctx);
+    setNext(copy, next, this.ctx);
+    return this.ctx.register(copy);
+  }
+
+  /**
+   * The actions that remain in place of `raw`, in order: the action itself (or a copy with a
+   * cleaned `/Next`) when the policy allows it, otherwise its cleaned successors spliced in.
+   * A cycle is cut where it closes; chains deeper than MAX_CHAIN are cut there.
+   */
+  chain(raw: PDFObject, policy: ActionPolicy, depth = 0): PDFObject[] {
+    const dict = this.ctx.lookup(raw);
+    if (!(dict instanceof PDFDict)) return [];
+    const memo = this.memo(this.chains, policy);
+    const hit = memo.get(dict);
+    if (hit) return hit;
+    if (this.inProgress.has(dict) || depth >= MAX_CHAIN) return [];
+    this.inProgress.add(dict);
+    const original = nextEntries(this.ctx, dict);
+    const next = original.flatMap((entry) => this.chain(entry, policy, depth + 1));
+    this.inProgress.delete(dict);
+    let result: PDFObject[];
+    if (!policy(dict)) result = next;
+    else if (sameEntries(original, next)) result = [raw];
+    else {
+      const copy = this.copyWithNext(dict, next);
+      result = copy ? [copy] : [];
+    }
+    memo.set(dict, result);
+    return result;
+  }
+
+  /** The single action to store in a slot, or null when nothing allowed remains. */
+  slot(raw: PDFObject, policy: ActionPolicy): PDFObject | null {
+    const dict = this.ctx.lookup(raw);
+    if (!(dict instanceof PDFDict)) return null;
+    const memo = this.memo(this.slots, policy);
+    if (memo.has(dict)) return memo.get(dict)!;
+    const [head, ...rest] = this.chain(raw, policy);
+    let result: PDFObject | null = head ?? null;
+    if (head !== undefined && rest.length > 0) {
+      // Several survivors: the first runs, then its own successors, then the others.
+      const headDict = this.ctx.lookup(head) as PDFDict;
+      result = this.copyWithNext(headDict, [...nextEntries(this.ctx, headDict), ...rest]);
+    }
+    memo.set(dict, result);
+    return result;
+  }
 }
 
 /** Cleans the action stored under `key`; deletes the entry when nothing allowed remains. */
-function cleanActionSlot(ctx: PDFContext, owner: PDFDict, key: string, safe = isSafeAction) {
+function cleanActionSlot(
+  cleaner: ActionCleaner,
+  owner: PDFDict,
+  key: string,
+  policy: ActionPolicy = isSafeAction,
+) {
   const raw = owner.get(N(key));
   if (raw === undefined) return;
-  const kept = cleanChain(ctx, raw, safe, new Set());
-  if (kept.length === 0) {
-    owner.delete(N(key));
-    return;
-  }
-  const [head, ...rest] = kept;
-  owner.set(N(key), head!);
-  if (rest.length > 0) {
-    // The head is this slot's own copy, so appending to its /Next touches nothing shared.
-    const headDict = ctx.lookup(head!) as PDFDict;
-    setNext(headDict, [...nextEntries(ctx, headDict), ...rest], ctx);
-  }
+  const kept = cleaner.slot(raw, policy);
+  if (kept === null) owner.delete(N(key));
+  else owner.set(N(key), kept);
 }
 
 /** Whether every action reachable from `raw` satisfies `safe` (a fail-closed re-check). */
@@ -147,7 +210,7 @@ export function chainSatisfies(ctx: PDFContext, raw: PDFObject, safe: ActionPoli
  * Cleans every outline item's action. Fails closed: an outline deeper or larger than the caps
  * (or with a cycle) is removed entirely, since bookmarks are a convenience in a flattened copy.
  */
-function cleanOutlines(doc: PDFDocument) {
+function cleanOutlines(doc: PDFDocument, cleaner: ActionCleaner) {
   const outlines = getDict(doc.catalog, 'Outlines');
   if (!outlines) return;
   const visited = new Set<PDFDict>();
@@ -163,7 +226,7 @@ function cleanOutlines(doc: PDFDocument) {
         return;
       }
       visited.add(item);
-      cleanActionSlot(doc.context, item, 'A');
+      cleanActionSlot(cleaner, item, 'A');
       walk(getDict(item, 'First'), depth + 1);
     }
   };
@@ -179,15 +242,19 @@ function cleanOutlines(doc: PDFDocument) {
  * is a destination array is navigation and is kept. Embedded files are the sender's content and
  * stay (spec §11.4).
  */
-export function stripActiveContent(doc: PDFDocument): void {
+export function stripActiveContent(
+  doc: PDFDocument,
+  opts: { cloneBudget?: number } = {},
+): { cloned: number } {
   const ctx = doc.context;
+  const cleaner = new ActionCleaner(ctx, opts.cloneBudget ?? CLONE_BUDGET);
   const catalog = doc.catalog;
   getDict(catalog, 'Names')?.delete(N('JavaScript'));
   catalog.delete(N('AA'));
   if (get(catalog, 'OpenAction') instanceof PDFDict) {
-    cleanActionSlot(ctx, catalog, 'OpenAction', isSafeOpenAction);
+    cleanActionSlot(cleaner, catalog, 'OpenAction', isSafeOpenAction);
   }
-  cleanOutlines(doc);
+  cleanOutlines(doc, cleaner);
   for (const page of doc.getPages()) {
     page.node.delete(N('AA'));
     const annots = getArray(page.node, 'Annots');
@@ -201,7 +268,7 @@ export function stripActiveContent(doc: PDFDocument): void {
       }
       const dict = annot as PDFDict;
       dict.delete(N('AA'));
-      cleanActionSlot(ctx, dict, 'A');
+      cleanActionSlot(cleaner, dict, 'A');
     }
   }
   // Fail closed: whatever happened above, an /OpenAction dictionary must be navigation only.
@@ -213,6 +280,7 @@ export function stripActiveContent(doc: PDFDocument): void {
   ) {
     catalog.delete(N('OpenAction'));
   }
+  return { cloned: cleaner.cloned };
 }
 
 const latin1 = (bytes: Uint8Array) => {

@@ -350,3 +350,61 @@ describe('chainSatisfies', () => {
     expect(chainSatisfies(ctx, ctx.obj([]), isSafeAction)).toBe(false);
   });
 });
+
+describe('stripActiveContent at scale', () => {
+  /** One page with `links` Link annotations sharing one chain of `length` alternating actions. */
+  async function sharedChain(links: number, length: number) {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage();
+    const ctx = doc.context;
+    let next: PDFRef | undefined;
+    for (let i = length - 1; i >= 0; i--) {
+      const action =
+        i % 2 === 0
+          ? ctx.obj({ S: 'URI', URI: PDFString.of(`https://example.com/${i}`) })
+          : ctx.obj({ S: 'JavaScript', JS: PDFString.of(`step(${i})`) });
+      if (next) action.set(N('Next'), next);
+      next = ctx.register(action);
+    }
+    const head = ctx.register(
+      ctx.obj({ S: 'GoTo', D: ctx.obj([page.ref, N('Fit')]), Next: next! }),
+    );
+    doc.catalog.set(N('OpenAction'), head);
+    const annots = ctx.obj([]);
+    for (let i = 0; i < links; i++) {
+      annots.push(
+        ctx.register(ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 1, 1], A: head })),
+      );
+    }
+    page.node.set(N('Annots'), annots);
+    return { doc, page };
+  }
+
+  it('cleans 5,000 links sharing one 200-action chain in linear work', async () => {
+    const { doc, page } = await sharedChain(5_000, 200);
+    const start = performance.now();
+    const { cloned } = stripActiveContent(doc);
+    expect(performance.now() - start).toBeLessThan(10_000);
+    // One copy per distinct kept action per policy, not per slot.
+    expect(cloned).toBeLessThanOrEqual(2 * 200);
+    const open = doc.catalog.lookup(N('OpenAction'), PDFDict);
+    expect(chainSatisfies(doc.context, doc.catalog.get(N('OpenAction'))!, isSafeOpenAction)).toBe(
+      true,
+    );
+    expect(open.get(N('Next'))).toBeUndefined();
+    const annots = page.node.lookup(N('Annots'), PDFArray);
+    const first = annots.lookup(0, PDFDict).get(N('A'));
+    expect(annots.lookup(4_999, PDFDict).get(N('A'))).toBe(first);
+    expect(chainSatisfies(doc.context, first!, isSafeAction)).toBe(true);
+  });
+
+  it('drops actions once the clone budget is spent (fail closed)', async () => {
+    const { doc, page } = await sharedChain(3, 20);
+    const { cloned } = stripActiveContent(doc, { cloneBudget: 2 });
+    expect(cloned).toBe(2);
+    const annots = page.node.lookup(N('Annots'), PDFArray);
+    const a = annots.lookup(0, PDFDict).get(N('A'));
+    // Whatever survived is still within policy.
+    expect(a === undefined || chainSatisfies(doc.context, a, isSafeAction)).toBe(true);
+  });
+});
