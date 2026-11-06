@@ -530,3 +530,59 @@ export function openSealedRecord(
     { id, password },
   );
 }
+
+// ── snippets and settings (Sprint 7) ──
+
+/** The N1 defaults, in their seeded order. */
+const SEEDED_SNIPPETS = [
+  'Full name',
+  'Address line 1',
+  'Address line 2',
+  'City/State/ZIP',
+  'Phone',
+  'Email',
+] as const;
+
+/** The Snippets panel, opened on its tab. */
+export async function snippetsPanel(page: Page) {
+  const panel = page.getByRole('complementary', { name: /fields, snippets and signatures/i });
+  await panel.getByRole('tab', { name: 'Snippets' }).click();
+  return panel;
+}
+
+/** Fills seeded snippets' values through Edit snippets, then returns to the snippet buttons. */
+export async function fillSnippets(
+  page: Page,
+  values: Partial<Record<(typeof SEEDED_SNIPPETS)[number], string>>,
+) {
+  const panel = await snippetsPanel(page);
+  await panel.getByRole('button', { name: 'Edit snippets' }).click();
+  for (const [label, value] of Object.entries(values)) {
+    const row = panel.getByRole('group', {
+      name: `Snippet ${SEEDED_SNIPPETS.indexOf(label as never) + 1}`,
+      exact: true,
+    });
+    await expect(row.getByLabel('Label')).toHaveValue(label);
+    await row.getByLabel('Value').fill(value);
+  }
+  await panel.getByRole('button', { name: 'Done' }).click();
+  return panel;
+}
+
+/** A snippet button in the panel, by its label (Today included). */
+export function snippetButton(panel: ReturnType<Page['getByRole']>, label: string) {
+  return panel.getByRole('list', { name: 'Snippets' }).getByRole('button', {
+    name: label,
+    exact: true,
+  });
+}
+
+/** Today in a format, from the test machine's clock (the browser shares it). */
+export function todayIn(format: 'MM/DD/YYYY' | 'YYYY-MM-DD'): string {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return format === 'YYYY-MM-DD'
+    ? `${now.getFullYear()}-${mm}-${dd}`
+    : `${mm}/${dd}/${now.getFullYear()}`;
+}
