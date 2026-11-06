@@ -53,12 +53,14 @@ export async function loadPdf(bytes: Uint8Array, opts: LoadOptions): Promise<Res
   let raw: PDFDocument;
   try {
     raw = await PDFDocument.load(bytes, { ...base, ignoreEncryption: true });
-    // The parser recovers from almost anything; a document without a page tree is damaged.
-    if (raw.getPageCount() === 0) return fail({ code: 'pdf.damaged' });
   } catch {
     return fail({ code: 'pdf.damaged' });
   }
-  if (!raw.isEncrypted) return ok({ doc: raw, encrypted: false, decryptable: true });
+  if (!raw.isEncrypted) {
+    return hasPages(raw)
+      ? ok({ doc: raw, encrypted: false, decryptable: true })
+      : fail({ code: 'pdf.damaged' });
+  }
 
   const candidates = [opts.password ?? ''];
   if (opts.password && utf8Binary(opts.password) !== opts.password) {
@@ -68,7 +70,7 @@ export async function loadPdf(bytes: Uint8Array, opts: LoadOptions): Promise<Res
   for (const password of candidates) {
     try {
       const doc = await PDFDocument.load(bytes, { ...base, password });
-      if (doc.isEncrypted) break;
+      if (doc.isEncrypted || !hasPages(doc)) break;
       return ok({ doc, encrypted: true, decryptable: decryptedContentLooksRight(doc) });
     } catch (e) {
       if (!isPasswordError(e)) break;
@@ -80,9 +82,21 @@ export async function loadPdf(bytes: Uint8Array, opts: LoadOptions): Promise<Res
       code: opts.password === undefined ? 'pdf.password-required' : 'pdf.password-wrong',
     });
   }
-  // An unsupported security handler or a decryption failure: page geometry is unencrypted, so
-  // inspection can still describe the pages, and export falls back to page images (spec §9.5).
-  return ok({ doc: raw, encrypted: true, decryptable: false });
+  // An unsupported security handler or a decryption failure: page geometry is unencrypted (unless
+  // it sits in an object stream), so inspection can still describe the pages, and export falls
+  // back to page images (spec §9.5).
+  return hasPages(raw)
+    ? ok({ doc: raw, encrypted: true, decryptable: false })
+    : fail({ code: 'pdf.damaged' });
+}
+
+/** The parser recovers from almost anything; a document without a page tree is damaged. */
+function hasPages(doc: PDFDocument): boolean {
+  try {
+    return doc.getPageCount() > 0;
+  } catch {
+    return false;
+  }
 }
 
 const hasCryptFilter = (stream: PDFStream) => {
