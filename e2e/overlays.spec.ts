@@ -61,13 +61,16 @@ test('a flat PDF: place, move, resize, undo, redo and download @all-engines', as
   await page.keyboard.press('d');
   await page.mouse.click(...at(100, 350));
   await expect(
-    page.getByRole('button', { name: `Date overlay: ${today()}, page 1` }),
+    page.getByRole('button', { name: `Date overlay: ${today()}, page 1`, exact: true }),
   ).toBeVisible();
 
   // The drawn signature, chosen in the panel and placed with a click.
   await page.getByRole('button', { name: 'Place Drawn' }).click();
   await page.mouse.click(...at(300, 450));
-  const signature = page.getByRole('button', { name: 'Signature overlay: Drawn, page 1', exact: true });
+  const signature = page.getByRole('button', {
+    name: 'Signature overlay: Drawn, page 1',
+    exact: true,
+  });
   await expect(signature).toBeVisible();
   const placed = (await signature.boundingBox())!;
 
