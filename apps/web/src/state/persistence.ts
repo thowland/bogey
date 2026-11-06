@@ -12,7 +12,7 @@ import { TIMING } from '../config.ts';
 
 export const DB_NAME = 'bogey';
 export const DB_VERSION = 1;
-export const RECORD_SCHEMA_VERSION = 1;
+export const RECORD_SCHEMA_VERSION = 2;
 
 export type Zoom = number | 'fit-width' | 'fit-page';
 

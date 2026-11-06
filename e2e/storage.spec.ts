@@ -8,6 +8,7 @@ import type { Page } from '@playwright/test';
 import {
   activeDocumentId,
   expect,
+  fieldLayer,
   openFixture,
   openFixtureAs,
   openSealedRecord,
@@ -15,7 +16,6 @@ import {
   renderedPage,
   savedByteCount,
   savedRecords,
-  sealRecordEdits,
   test,
   waitForSaved,
   watchViolations,
@@ -24,9 +24,10 @@ import {
 const MULTIPAGE = 'vendored/generated/multipage-rotations.pdf';
 const ENCRYPTED = 'vendored/generated/acroform-all-aes256.pdf';
 
-// Sprints 4 and 5 add the overlay and field UI; until then the edits of an earlier session are
-// written into the record directly, and the test checks they come back into the app's edit state
-// (the next autosave writes them out again rather than an empty state).
+// Sprint 4 adds the overlay UI; until it is on master, the multipage test writes an earlier
+// session's edits into the record directly and checks they come back into the app's edit state
+// (the next autosave writes them out again rather than an empty state). Field values also go
+// through Sprint 5's field UI in the acroform test.
 const EDITS = {
   fieldValues: { 'applicant.name': 'Jane Doe' },
   overlays: [
@@ -189,45 +190,47 @@ test('Clear everything leaves an empty app after the reload (S7) @all-engines', 
   expect(await savedByteCount(page)).toBe(0);
 });
 
+test('typed values come back after a reload (acceptance 3) @all-engines', async ({ page }) => {
+  await page.goto('/');
+  await openFixture(page, 'vendored/generated/acroform-all.pdf');
+  await renderedPage(page, 1);
+  await waitForSaved(page, 'acroform-all.pdf');
+  await fieldLayer(page).getByRole('textbox', { name: 'text1' }).fill('Ada Lovelace');
+  await chooseZoom(page, '150%');
+  await expect
+    .poll(async () => (await savedRecords(page))[0]?.fieldValues)
+    .toEqual({ text1: 'Ada Lovelace' });
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Zoom level: 150%' })).toBeVisible();
+  await expect(fieldLayer(page).getByRole('textbox', { name: 'text1' })).toHaveValue(
+    'Ada Lovelace',
+  );
+});
+
 test('the edits of a password-protected document are sealed at rest and come back with the password @all-engines', async ({
   page,
 }) => {
   test.setTimeout(180_000);
   const marker = 'SSN-123-45-6789';
-  const edits = {
-    fieldValues: { 'text.single': marker },
-    overlays: [
-      { id: 'e2e-ssn', type: 'text', page: 0, x: 72, y: 500, text: marker, size: 12, bold: false },
-    ],
-  };
   await page.goto('/');
   await openFixture(page, ENCRYPTED, 'bogey');
   await renderedPage(page, 1);
   const { id } = await waitForSaved(page, 'acroform-all-aes256.pdf');
-  // The first save seals an empty edit state and fixes the document's salt.
+  await fieldLayer(page).getByRole('textbox', { name: 'text1' }).fill(marker);
   await expect
     .poll(async () => (await openSealedRecord(page, id, 'bogey')).edits)
-    .toEqual({
-      fieldValues: {},
-      overlays: [],
-    });
-  await sealRecordEdits(page, id, 'bogey', edits);
+    .toEqual({ fieldValues: { text1: marker }, overlays: [] });
+  const stored = await openSealedRecord(page, id, 'bogey');
+  expect(stored.text).not.toContain(marker);
+  expect(stored.text).not.toContain('bogey');
+  expect((await savedRecords(page))[0]).toMatchObject({ fieldValues: {}, hasThumbnail: false });
 
   await page.reload();
   const dialog = page.getByRole('dialog', { name: 'Password required' });
   await dialog.getByLabel('Password').fill('bogey');
   await dialog.getByRole('button', { name: 'Open' }).click();
   await renderedPage(page, 1);
-
-  // A change makes the next autosave seal the edit state the app restored.
-  const before = (await openSealedRecord(page, id, 'bogey')).updatedAt;
-  await chooseZoom(page, '150%');
-  await expect
-    .poll(async () => (await openSealedRecord(page, id, 'bogey')).updatedAt)
-    .not.toBe(before);
-  const stored = await openSealedRecord(page, id, 'bogey');
-  expect(stored.edits).toEqual(edits);
-  expect(stored.text).not.toContain(marker);
-  expect(stored.text).not.toContain('bogey');
+  await expect(fieldLayer(page).getByRole('textbox', { name: 'text1' })).toHaveValue(marker);
   await expect(page.getByText('could not be unlocked')).toHaveCount(0);
 });

@@ -110,11 +110,19 @@ const sharedRepository = () => useStorageStore.getState().repository;
 type Migration = (record: Record<string, unknown>) => Record<string, unknown>;
 
 /**
- * The migration table: `MIGRATIONS[n]` turns a version n record into version n + 1. Version 1 is
- * the first schema, so the table is empty; a future change adds `1: (record) => ({ ... })` and
- * raises RECORD_SCHEMA_VERSION.
+ * The migration table: `MIGRATIONS[n]` turns a version n record into version n + 1.
+ *
+ * 1 → 2 (security review, Sprint 6): records of encrypted documents written before edits were
+ * sealed may hold a page-1 thumbnail and plaintext edits. Unsealed ones lose both, once. Version 2
+ * records of documents encrypted with only an owner password, which open without one and cannot be
+ * sealed, keep their plaintext edits.
  */
-export const MIGRATIONS: Readonly<Record<number, Migration>> = {};
+export const MIGRATIONS: Readonly<Record<number, Migration>> = {
+  1: (record) =>
+    record.encrypted === true && record.sealed === undefined
+      ? { ...record, thumbnail: null, fieldValues: {}, overlays: [] }
+      : record,
+};
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -190,6 +190,53 @@ describe('records and migrations (spec §10.5)', () => {
   });
 });
 
+describe('scrubbing records saved before sealing (security review)', () => {
+  it('drops the thumbnail and plaintext edits of an unsealed encrypted record, once', async () => {
+    const repository = await attach();
+    const leaky = {
+      ...record('enc'),
+      encrypted: true,
+      thumbnail: new Uint8Array([1, 2]).buffer,
+      fieldValues: { ssn: 'SSN-123-45-6789' },
+      overlays: [overlay],
+      schemaVersion: 1,
+    } as DocumentRecord;
+    const plain = { ...record('plain'), fieldValues: { name: 'Jane' }, schemaVersion: 1 };
+    await repository.putMany([
+      { store: 'documents', value: leaky },
+      { store: 'documents', value: plain as DocumentRecord },
+    ]);
+    await prepareLibrary(repository, NOW);
+
+    const stored = await repository.get('documents', 'enc');
+    expect(stored).toMatchObject({
+      thumbnail: null,
+      fieldValues: {},
+      overlays: [],
+      schemaVersion: RECORD_SCHEMA_VERSION,
+    });
+    expect(JSON.stringify(stored)).not.toContain('SSN');
+    expect(useSessionStore.getState().recent.find((r) => r.id === 'enc')).toMatchObject({
+      thumbnail: null,
+      fieldValues: {},
+    });
+    // Unencrypted records keep their edits.
+    expect(await repository.get('documents', 'plain')).toMatchObject({
+      fieldValues: { name: 'Jane' },
+    });
+  });
+
+  it('leaves current records alone, including owner-password-only documents', async () => {
+    const repository = await attach();
+    const ownerOnly = { ...record('owner'), encrypted: true, fieldValues: { name: 'Jane' } };
+    await repository.put('documents', ownerOnly);
+    await prepareLibrary(repository, NOW);
+    expect(await repository.get('documents', 'owner')).toMatchObject({
+      fieldValues: { name: 'Jane' },
+    });
+  });
+});
+
 describe('settings', () => {
   it('reads and writes the session settings', async () => {
     const repository = await attach();
