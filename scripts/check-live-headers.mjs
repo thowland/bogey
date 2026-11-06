@@ -89,15 +89,19 @@ for (const path of ['/', ...assets]) {
   else checkHeaders(`${path} (304)`, revalidated);
 }
 
+// CloudFront refuses methods other than GET and HEAD with 403, which the stack's error mapping
+// serves as the app's 404 page; either way the refusal comes from the edge, not the origin.
 const post = await new Promise((resolve, reject) => {
   const request = https.request(new URL('/', site), { method: 'POST' }, (response) => {
     response.resume();
-    resolve(response.statusCode);
+    resolve({ status: response.statusCode, cache: response.headers['x-cache'] ?? '' });
   });
   request.on('error', reject);
   request.end('x');
 });
-if (post !== 403) problems.push(`POST /: status ${post}, expected 403 (GET and HEAD only)`);
+if (![403, 404].includes(post.status) || !/Error from cloudfront/i.test(post.cache)) {
+  problems.push(`POST /: status ${post.status}, x-cache ${post.cache}; expected an edge refusal`);
+}
 
 const plain = new URL('/', site);
 plain.protocol = 'http:';
