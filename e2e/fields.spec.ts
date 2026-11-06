@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import type { Locator, Page } from '@playwright/test';
 import {
   expect,
-  exportInNode,
+  download,
   fieldLayer,
   fieldsPanel,
   inkInBox,
@@ -188,9 +188,7 @@ test('a hybrid XFA form fills its AcroForm fields @all-engines', async ({ page }
   ).toBeVisible();
 });
 
-// Interim export check: Sprint 4's export dialog is not on master yet, so the values the app's
-// controls hold are exported through core in Node, exactly as the pdf worker does. The combined
-// MVP scenario through the real download replaces this once both sprints have merged.
+// The values the app's controls hold, downloaded through the export dialog (Sprint 4).
 test('the filled values export flattened @all-engines', async ({ page }) => {
   await page.goto('/');
   await openFixture(page, 'vendored/generated/acroform-all.pdf');
@@ -223,7 +221,9 @@ test('the filled values export flattened @all-engines', async ({ page }) => {
     list1: ['One', 'Three'],
   });
 
-  const bytes = await exportInNode('vendored/generated/acroform-all.pdf', values);
+  const { bytes } = await download(page, () =>
+    page.getByRole('button', { name: 'Download', exact: true }).click(),
+  );
   const out = await readFlattened(bytes);
   expect(out.fields).toBe(0);
   for (const text of ['Ada Lovelace', 'First line', 'Gamma', 'Fixed value']) {
@@ -258,7 +258,9 @@ test('the W-9 exports Other and 3b checked', async ({ page }) => {
   expect(values[other]).toBe(true);
   expect(values[b3]).toBe(true);
 
-  const bytes = await exportInNode('fetched/irs/fw9.pdf', values);
+  const { bytes } = await download(page, () =>
+    page.getByRole('button', { name: 'Download', exact: true }).click(),
+  );
   const out = await readFlattened(bytes);
   expect(out.fields).toBe(0);
   expect(out.draws('Tim Howland')).toBe(true);

@@ -4,6 +4,9 @@ import type { Overlay, PdfInfo } from '@bogey/core';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LIMITS } from '../src/config.ts';
+// Sprint 4's reset clears the edits when a document closes or another starts opening; it subscribes
+// first, as in the app, so these tests see the same order.
+import '../src/features/overlays/documentReset.ts';
 import { useDocumentStore } from '../src/state/document.ts';
 import { useEditsStore } from '../src/state/edits.ts';
 import {
@@ -527,6 +530,25 @@ describe('the session controller (M1, D7)', () => {
     await settle(repository);
     expect(await repository.get('documents', 'a')).toMatchObject({ lastPage: 2 });
     expect(await readSetting(repository, 'activeDocumentId')).toBeNull();
+  });
+
+  it('keeps the closing document’s edits when the stores are cleared before it is saved', async () => {
+    await open('a');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    useEditsStore.getState().load({ fieldValues: { name: 'Jane' }, overlays: [overlay] });
+    useViewStore.getState().setPage(2);
+    // Opening another file: the document store resets, Sprint 4 clears the edits, the view resets.
+    useDocumentStore.getState().reset();
+    useViewStore.getState().setPage(0);
+    vi.advanceTimersByTime(1000);
+    vi.useRealTimers();
+    await settle(repository);
+    expect(useEditsStore.getState().present.fieldValues).toEqual({});
+    expect(await repository.get('documents', 'a')).toMatchObject({
+      lastPage: 2,
+      fieldValues: { name: 'Jane' },
+      overlays: [{ id: 'o1' }],
+    });
   });
 
   it('switches records when another document opens directly', async () => {

@@ -22,6 +22,7 @@ import {
   type DocumentRecord,
   type Repository,
   type SettingsValues,
+  type Zoom,
 } from './persistence.ts';
 import { useStorageStore } from './storage.ts';
 import { useViewStore } from './view.ts';
@@ -454,6 +455,12 @@ export function createSessionController(options: SessionControllerOptions): Sess
     options.persistBytes ?? ((id, name, bytes) => persistOpenedBytes(id, name, bytes));
   const expected = new Map<string, DocumentRecord>();
   let record: DocumentRecord | null = null;
+  /**
+   * The page, zoom and edits of the active document, followed only while it is ready. Other
+   * features clear the stores when a document closes or another starts opening; the last write of
+   * the outgoing document uses this copy, so it never saves that cleared state over its work.
+   */
+  let live: { page: number; zoom: Zoom; edits: DocumentEditState } | null = null;
   let sealing: Sealing | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let applying = false;
@@ -469,16 +476,28 @@ export function createSessionController(options: SessionControllerOptions): Sess
 
   /** The active record with the stores' current page, zoom and edits. */
   const snapshot = (base: DocumentRecord): DocumentRecord => {
-    const { page, zoom } = useViewStore.getState();
-    const { present } = useEditsStore.getState();
+    const current = live ?? {
+      page: base.lastPage,
+      zoom: base.zoom,
+      edits: { fieldValues: base.fieldValues, overlays: base.overlays },
+    };
     return {
       ...base,
-      lastPage: page,
-      zoom,
-      fieldValues: present.fieldValues,
-      overlays: present.overlays,
+      lastPage: current.page,
+      zoom: current.zoom,
+      fieldValues: current.edits.fieldValues,
+      overlays: current.edits.overlays,
       updatedAt: now(),
     };
+  };
+
+  /** Follows the stores while the active document is the one on screen. */
+  const follow = () => {
+    const doc = useDocumentStore.getState();
+    if (!record || doc.status !== 'ready' || doc.id !== record.id) return false;
+    const { page, zoom } = useViewStore.getState();
+    live = { page, zoom, edits: useEditsStore.getState().present };
+    return true;
   };
 
   /**
@@ -661,6 +680,8 @@ export function createSessionController(options: SessionControllerOptions): Sess
       ...(info.encrypted ? { thumbnail: null } : {}),
     };
     sealing = null;
+    live = null;
+    follow();
     if (protectedByPassword) startSealing(id, state.password!, info, saved);
     void (async () => {
       if (session().deferred === id && state.bytes) {
@@ -685,6 +706,7 @@ export function createSessionController(options: SessionControllerOptions): Sess
     if (record && timer !== null) void write();
     cancelTimer();
     record = null;
+    live = null;
     sealing = null;
     void setActive(null);
   };
@@ -709,10 +731,11 @@ export function createSessionController(options: SessionControllerOptions): Sess
       unsubscribers = [
         useDocumentStore.subscribe(onDocument),
         useViewStore.subscribe((state, previous) => {
-          if (state.page !== previous.page || state.zoom !== previous.zoom) schedule();
+          if ((state.page !== previous.page || state.zoom !== previous.zoom) && follow())
+            schedule();
         }),
         useEditsStore.subscribe((state, previous) => {
-          if (state.present !== previous.present) schedule();
+          if (state.present !== previous.present && follow()) schedule();
         }),
       ];
       const doc = options.document;
@@ -734,6 +757,7 @@ export function createSessionController(options: SessionControllerOptions): Sess
       for (const unsubscribe of unsubscribers) unsubscribe();
       unsubscribers = [];
       record = null;
+      live = null;
       sealing = null;
     },
     expect(saved) {

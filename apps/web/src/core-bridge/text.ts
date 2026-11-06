@@ -9,3 +9,5 @@ export {
   replaceNonWinAnsi,
   textWidth,
 } from '@bogey/core';
+// Sprint 4: export preflight (E4), output naming (D8) and the check mark's metrics (O4).
+export { CHECK_GLYPH, X_MARK, outputFileName, preflightExport } from '@bogey/core';

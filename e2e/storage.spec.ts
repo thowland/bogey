@@ -12,7 +12,7 @@ import {
   openFixture,
   openFixtureAs,
   openSealedRecord,
-  patchRecord,
+  pageArea,
   renderedPage,
   savedByteCount,
   savedRecords,
@@ -24,62 +24,57 @@ import {
 const MULTIPAGE = 'vendored/generated/multipage-rotations.pdf';
 const ENCRYPTED = 'vendored/generated/acroform-all-aes256.pdf';
 
-// Sprint 4 adds the overlay UI; until it is on master, the multipage test writes an earlier
-// session's edits into the record directly and checks they come back into the app's edit state
-// (the next autosave writes them out again rather than an empty state). Field values also go
-// through Sprint 5's field UI in the acroform test.
-const EDITS = {
-  fieldValues: { 'applicant.name': 'Jane Doe' },
-  overlays: [
-    {
-      id: 'e2e-text',
-      type: 'text',
-      page: 2,
-      x: 72,
-      y: 600,
-      text: 'Jane Doe',
-      size: 12,
-      bold: false,
-    },
-  ],
-};
-
 async function chooseZoom(page: Page, label: string) {
   await page.getByRole('button', { name: /Zoom level/ }).click();
   await page.getByRole('menuitemradio', { name: label, exact: true }).click();
   await expect(page.getByRole('button', { name: `Zoom level: ${label}` })).toBeVisible();
 }
 
-/** Opens the multipage fixture, moves to page 3 at 150%, and seeds an earlier session's edits. */
+/** Places a text overlay with the T tool at (x, y) CSS px from the page's top-left. */
+async function placeText(page: Page, text: string, x = 100, y = 150) {
+  const { box } = await pageArea(page);
+  // The toolbar button rather than T, which a focused form field would take as typing.
+  await page.getByRole('group', { name: 'Tools' }).getByRole('button', { name: /^Text/ }).click();
+  await page.mouse.click(box.x + x, box.y + y);
+  await page.keyboard.type(text);
+  await page.keyboard.press('Enter');
+}
+
+/** Opens the multipage fixture, moves to page 3, types on it, and zooms to 150%. */
 async function startEditing(page: Page) {
   await openFixture(page, MULTIPAGE);
   await renderedPage(page, 1);
   const { id } = await waitForSaved(page, 'multipage-rotations.pdf');
   await page.keyboard.press(']');
   await page.keyboard.press(']');
+  await renderedPage(page, 3);
+  await placeText(page, 'Jane Doe');
+  await expect(
+    page.getByRole('button', { name: 'Text overlay: Jane Doe, page 3', exact: true }),
+  ).toBeVisible();
   await chooseZoom(page, '150%');
-  await expect.poll(async () => (await savedRecords(page))[0]?.zoom).toBe(1.5);
-  await patchRecord(page, id, EDITS);
+  await expect
+    .poll(async () => {
+      const saved = (await savedRecords(page)).find((record) => record.id === id);
+      return saved && { page: saved.lastPage, zoom: saved.zoom, overlays: saved.overlays.length };
+    })
+    .toEqual({ page: 2, zoom: 1.5, overlays: 1 });
   return id;
 }
 
-/** Checks that the document came back at page 3, 150%, with its edits. */
+/** Checks that the document came back at page 3, 150%, with its overlay. */
 async function expectRestored(page: Page, id: string) {
   await expect(page.getByText('Page 3 of 4')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Zoom level: 150%' })).toBeVisible();
   await renderedPage(page, 3);
-  // Any change makes the next autosave write the edit state the app now holds.
-  await page.keyboard.press('[');
-  await expect
-    .poll(async () => (await savedRecords(page)).find((record) => record.id === id)?.lastPage)
-    .toBe(1);
+  await expect(
+    page.getByRole('button', { name: 'Text overlay: Jane Doe, page 3', exact: true }),
+  ).toBeVisible();
   const saved = (await savedRecords(page)).find((record) => record.id === id)!;
-  expect(saved.fieldValues).toEqual(EDITS.fieldValues);
-  expect(saved.overlays).toEqual(EDITS.overlays);
   expect(saved.hasThumbnail).toBe(true);
 }
 
-test('reloading mid-edit restores the page, zoom, values and overlays (acceptance 3) @all-engines', async ({
+test('reloading mid-edit restores the page, zoom and overlays (acceptance 3) @all-engines', async ({
   page,
 }) => {
   await page.goto('/');
@@ -190,22 +185,31 @@ test('Clear everything leaves an empty app after the reload (S7) @all-engines', 
   expect(await savedByteCount(page)).toBe(0);
 });
 
-test('typed values come back after a reload (acceptance 3) @all-engines', async ({ page }) => {
+test('field values and overlays come back after a reload (acceptance 3) @all-engines', async ({
+  page,
+}) => {
   await page.goto('/');
   await openFixture(page, 'vendored/generated/acroform-all.pdf');
   await renderedPage(page, 1);
   await waitForSaved(page, 'acroform-all.pdf');
   await fieldLayer(page).getByRole('textbox', { name: 'text1' }).fill('Ada Lovelace');
+  await placeText(page, 'Signed in Boston', 300, 40);
   await chooseZoom(page, '150%');
   await expect
-    .poll(async () => (await savedRecords(page))[0]?.fieldValues)
-    .toEqual({ text1: 'Ada Lovelace' });
+    .poll(async () => {
+      const [saved] = await savedRecords(page);
+      return saved && { values: saved.fieldValues, overlays: saved.overlays.length };
+    })
+    .toEqual({ values: { text1: 'Ada Lovelace' }, overlays: 1 });
 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Zoom level: 150%' })).toBeVisible();
   await expect(fieldLayer(page).getByRole('textbox', { name: 'text1' })).toHaveValue(
     'Ada Lovelace',
   );
+  await expect(
+    page.getByRole('button', { name: 'Text overlay: Signed in Boston, page 1', exact: true }),
+  ).toBeVisible();
 });
 
 test('the edits of a password-protected document are sealed at rest and come back with the password @all-engines', async ({
@@ -218,9 +222,16 @@ test('the edits of a password-protected document are sealed at rest and come bac
   await renderedPage(page, 1);
   const { id } = await waitForSaved(page, 'acroform-all-aes256.pdf');
   await fieldLayer(page).getByRole('textbox', { name: 'text1' }).fill(marker);
+  await placeText(page, marker, 300, 40);
   await expect
-    .poll(async () => (await openSealedRecord(page, id, 'bogey')).edits)
-    .toEqual({ fieldValues: { text1: marker }, overlays: [] });
+    .poll(async () => {
+      const edits = (await openSealedRecord(page, id, 'bogey')).edits as {
+        fieldValues: Record<string, string>;
+        overlays: { text: string }[];
+      } | null;
+      return edits && { values: edits.fieldValues, texts: edits.overlays.map((o) => o.text) };
+    })
+    .toEqual({ values: { text1: marker }, texts: [marker] });
   const stored = await openSealedRecord(page, id, 'bogey');
   expect(stored.text).not.toContain(marker);
   expect(stored.text).not.toContain('bogey');
@@ -232,5 +243,8 @@ test('the edits of a password-protected document are sealed at rest and come bac
   await dialog.getByRole('button', { name: 'Open' }).click();
   await renderedPage(page, 1);
   await expect(fieldLayer(page).getByRole('textbox', { name: 'text1' })).toHaveValue(marker);
+  await expect(
+    page.getByRole('button', { name: `Text overlay: ${marker}, page 1`, exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('could not be unlocked')).toHaveCount(0);
 });
