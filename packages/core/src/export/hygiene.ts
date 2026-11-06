@@ -5,8 +5,10 @@ import {
   PDFArray,
   PDFDict,
   PDFName,
+  PDFHexString,
   PDFRawStream,
   PDFStream,
+  PDFString,
   type PDFContext,
   type PDFDocument,
   type PDFObject,
@@ -16,28 +18,60 @@ import { get, getArray, getDict } from '../inspect/pdfObjects.ts';
 const N = PDFName.of;
 
 /**
- * Actions an export may keep: internal navigation and links, which flattened forms often carry
- * and the recipient expects. Everything else (JavaScript, Launch, SubmitForm, ImportData,
- * ResetForm, Rendition, GoToR, GoToE, Hide, Named, …) is removed.
+ * The action policy (spec §9.1 step 4): an export keeps only `GoTo` (internal navigation) and
+ * `URI` actions whose target is an absolute `http:`, `https:` or `mailto:` URL, which flattened
+ * forms often carry and the recipient expects. Everything else (JavaScript, Launch, SubmitForm,
+ * ImportData, ResetForm, Rendition, GoToR, GoToE, Hide, Named, other URI schemes, …) is removed,
+ * and an `/OpenAction` keeps only `GoTo` (or a destination array).
  */
-export const SAFE_ACTIONS: ReadonlySet<string> = new Set(['GoTo', 'URI']);
+const SAFE_URI = /^(?:https?:\/\/|mailto:)[^\s\p{Cc}]+$/iu;
 
-/** Annotation types that exist to run media or scripts; removed outright. */
-export const ACTIVE_ANNOTATIONS: ReadonlySet<string> = new Set([
-  'RichMedia',
-  'Screen',
-  'Movie',
-  'Sound',
+/** Annotation subtypes an export keeps; every other subtype (3D, RichMedia, Screen, Movie, Sound, unknown) is removed. */
+export const PASSIVE_ANNOTATIONS: ReadonlySet<string> = new Set([
+  'Text',
+  'Link',
+  'FreeText',
+  'Line',
+  'Square',
+  'Circle',
+  'Polygon',
+  'PolyLine',
+  'Highlight',
+  'Underline',
+  'Squiggly',
+  'StrikeOut',
+  'Stamp',
+  'Caret',
+  'Ink',
+  'Popup',
+  'Widget',
+  // Kept like embedded files (spec §11.4); its actions are stripped like any other annotation's.
+  'FileAttachment',
 ]);
 
 const MAX_CHAIN = 256;
 const MAX_OUTLINE_ITEMS = 100_000;
 const MAX_OUTLINE_DEPTH = 64;
 
+type ActionPolicy = (action: PDFDict) => boolean;
+
 const actionType = (dict: PDFDict) => {
   const s = get(dict, 'S');
   return s instanceof PDFName ? s.decodeText() : '';
 };
+
+/** Whether an action may stay in a link, outline item or other annotation. */
+export const isSafeAction: ActionPolicy = (action) => {
+  const type = actionType(action);
+  if (type === 'GoTo') return true;
+  if (type !== 'URI') return false;
+  const uri = get(action, 'URI');
+  const text = uri instanceof PDFString || uri instanceof PDFHexString ? uri.decodeText() : '';
+  return SAFE_URI.test(text);
+};
+
+/** `/OpenAction` runs without a click, so only navigation survives there. */
+const isSafeOpenAction: ActionPolicy = (action) => actionType(action) === 'GoTo';
 
 /** `/Next` as a list of raw entries (a single action or an array of them). */
 function nextEntries(ctx: PDFContext, dict: PDFDict): PDFObject[] {
@@ -55,24 +89,29 @@ function setNext(dict: PDFDict, entries: PDFObject[], ctx: PDFContext) {
 
 /**
  * Cleans one action and its `/Next` chain. Returns the actions that remain in its place, in
- * order: the action itself when it is safe, otherwise its cleaned successors spliced in. Cycles
- * are cut at the first repeated action.
+ * order: the action itself when the policy allows it, otherwise its cleaned successors spliced
+ * in. Cycles are cut at the first repeated action.
  */
-function cleanChain(ctx: PDFContext, raw: PDFObject, visited: Set<PDFDict>): PDFObject[] {
+function cleanChain(
+  ctx: PDFContext,
+  raw: PDFObject,
+  safe: ActionPolicy,
+  visited: Set<PDFDict>,
+): PDFObject[] {
   const dict = ctx.lookup(raw);
   if (!(dict instanceof PDFDict) || visited.has(dict) || visited.size >= MAX_CHAIN) return [];
   visited.add(dict);
-  const next = nextEntries(ctx, dict).flatMap((entry) => cleanChain(ctx, entry, visited));
-  if (!SAFE_ACTIONS.has(actionType(dict))) return next;
+  const next = nextEntries(ctx, dict).flatMap((entry) => cleanChain(ctx, entry, safe, visited));
+  if (!safe(dict)) return next;
   setNext(dict, next, ctx);
   return [raw];
 }
 
-/** Cleans the action stored under `key`; deletes the entry when nothing safe remains. */
-function cleanActionSlot(ctx: PDFContext, owner: PDFDict, key: string) {
+/** Cleans the action stored under `key`; deletes the entry when nothing allowed remains. */
+function cleanActionSlot(ctx: PDFContext, owner: PDFDict, key: string, safe = isSafeAction) {
   const raw = owner.get(N(key));
   if (raw === undefined) return;
-  const kept = cleanChain(ctx, raw, new Set());
+  const kept = cleanChain(ctx, raw, safe, new Set());
   if (kept.length === 0) {
     owner.delete(N(key));
     return;
@@ -85,35 +124,50 @@ function cleanActionSlot(ctx: PDFContext, owner: PDFDict, key: string) {
   }
 }
 
+/**
+ * Cleans every outline item's action. Fails closed: an outline deeper or larger than the caps
+ * (or with a cycle) is removed entirely, since bookmarks are a convenience in a flattened copy.
+ */
 function cleanOutlines(doc: PDFDocument) {
   const outlines = getDict(doc.catalog, 'Outlines');
   if (!outlines) return;
   const visited = new Set<PDFDict>();
+  let exceeded = false;
   const walk = (first: PDFDict | undefined, depth: number) => {
-    let item = first;
-    while (item && !visited.has(item) && visited.size < MAX_OUTLINE_ITEMS) {
+    if (depth > MAX_OUTLINE_DEPTH) {
+      if (first) exceeded = true;
+      return;
+    }
+    for (let item = first; item && !exceeded; item = getDict(item, 'Next')) {
+      if (visited.has(item) || visited.size >= MAX_OUTLINE_ITEMS) {
+        exceeded = true;
+        return;
+      }
       visited.add(item);
       cleanActionSlot(doc.context, item, 'A');
-      if (depth < MAX_OUTLINE_DEPTH) walk(getDict(item, 'First'), depth + 1);
-      item = getDict(item, 'Next');
+      walk(getDict(item, 'First'), depth + 1);
     }
   };
   walk(getDict(outlines, 'First'), 0);
+  if (exceeded) doc.catalog.delete(N('Outlines'));
 }
 
 /**
  * Removes active content (spec §9.1 step 4): the `/Names /JavaScript` tree; every `/AA`
- * (catalog, pages, annotations); RichMedia, Screen, Movie and Sound annotations; and, wherever
- * an action lives (catalog `/OpenAction`, outline items, annotation `/A`), every action outside
- * {@link SAFE_ACTIONS}, including those chained through `/Next`. An `/OpenAction` that is a
- * destination array is navigation and is kept. Embedded files are the sender's content and stay.
+ * (catalog, pages, annotations); annotations outside {@link PASSIVE_ANNOTATIONS}; and, wherever
+ * an action lives (catalog `/OpenAction`, outline items, annotation `/A`), every action the
+ * policy above does not allow, including those chained through `/Next`. An `/OpenAction` that
+ * is a destination array is navigation and is kept. Embedded files are the sender's content and
+ * stay (spec §11.4).
  */
 export function stripActiveContent(doc: PDFDocument): void {
   const ctx = doc.context;
   const catalog = doc.catalog;
   getDict(catalog, 'Names')?.delete(N('JavaScript'));
   catalog.delete(N('AA'));
-  if (get(catalog, 'OpenAction') instanceof PDFDict) cleanActionSlot(ctx, catalog, 'OpenAction');
+  if (get(catalog, 'OpenAction') instanceof PDFDict) {
+    cleanActionSlot(ctx, catalog, 'OpenAction', isSafeOpenAction);
+  }
   cleanOutlines(doc);
   for (const page of doc.getPages()) {
     page.node.delete(N('AA'));
@@ -121,14 +175,14 @@ export function stripActiveContent(doc: PDFDocument): void {
     if (!annots) continue;
     for (let i = annots.size() - 1; i >= 0; i--) {
       const annot = annots.lookup(i);
-      if (!(annot instanceof PDFDict)) continue;
-      const subtype = get(annot, 'Subtype');
-      if (subtype instanceof PDFName && ACTIVE_ANNOTATIONS.has(subtype.decodeText())) {
+      const subtype = annot instanceof PDFDict ? get(annot, 'Subtype') : undefined;
+      if (!(subtype instanceof PDFName) || !PASSIVE_ANNOTATIONS.has(subtype.decodeText())) {
         annots.remove(i);
         continue;
       }
-      annot.delete(N('AA'));
-      cleanActionSlot(ctx, annot, 'A');
+      const dict = annot as PDFDict;
+      dict.delete(N('AA'));
+      cleanActionSlot(ctx, dict, 'A');
     }
   }
 }

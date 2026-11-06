@@ -53,6 +53,8 @@ export async function loadPdf(bytes: Uint8Array, opts: LoadOptions): Promise<Res
   let raw: PDFDocument;
   try {
     raw = await PDFDocument.load(bytes, { ...base, ignoreEncryption: true });
+    // The parser recovers from almost anything; a document without a page tree is damaged.
+    if (raw.getPageCount() === 0) return fail({ code: 'pdf.damaged' });
   } catch {
     return fail({ code: 'pdf.damaged' });
   }

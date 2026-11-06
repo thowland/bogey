@@ -4,7 +4,7 @@ import { PDFBool, PDFName, type PDFDocument } from '@cantoo/pdf-lib';
 import { pageGeometry } from '../geometry/index.ts';
 import type { FormType, PdfInfo, XfaKind } from '../model/document.ts';
 import type { PageGeometry } from '../model/geometry.ts';
-import { ok, type Problem, type Result } from '../result.ts';
+import { fail, ok, type Problem, type Result } from '../result.ts';
 import { enumerateFields, type EnumeratedFields } from './fields.ts';
 import { loadPdf } from './load.ts';
 import { get, getDict, getNumber, inherited, numbersOf } from './pdfObjects.ts';
@@ -73,6 +73,17 @@ const NO_FIELDS: EnumeratedFields = { fields: [], initialValues: {} };
 export async function inspectPdf(
   bytes: Uint8Array,
   opts: { password?: string } = {},
+): Promise<Result<PdfInfo, InspectProblem>> {
+  try {
+    return await inspectLoaded(bytes, opts);
+  } catch {
+    return fail({ code: 'pdf.damaged' });
+  }
+}
+
+async function inspectLoaded(
+  bytes: Uint8Array,
+  opts: { password?: string },
 ): Promise<Result<PdfInfo, InspectProblem>> {
   const loaded = await loadPdf(bytes, { ...opts, preserveXFA: true });
   if (!loaded.ok) return loaded;

@@ -134,7 +134,7 @@ export async function exportPdf(
       });
     }
     const { doc, decryptable } = loaded.value;
-    if (!decryptable) return fail({ code: 'export.cannot-decrypt' });
+    if (!decryptable || !input.info.decryptable) return fail({ code: 'export.cannot-decrypt' });
     const pageCount = doc.getPageCount();
 
     onStage('fields');

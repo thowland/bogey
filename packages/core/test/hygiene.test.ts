@@ -1,8 +1,20 @@
 // Active-content stripping (spec §9.1 step 4, §11.4): an allow-list of actions, applied wherever
 // actions live, with /Next chains spliced and cycles cut.
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFString, type PDFRef } from '@cantoo/pdf-lib';
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFString,
+  type PDFRef,
+} from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { removeEncryptionLeftovers, stripActiveContent } from '../src/export/hygiene.ts';
+import {
+  isSafeAction,
+  removeEncryptionLeftovers,
+  stripActiveContent,
+} from '../src/export/hygiene.ts';
 import { exportPdf, inspectPdf } from '../src/index.ts';
 import { makeForm } from './helpers.ts';
 
@@ -17,8 +29,12 @@ async function hostile() {
   const js = () => action('JavaScript', { JS: PDFString.of('app.alert(1)') });
   const uri = (u: string) => action('URI', { URI: PDFString.of(u) });
 
-  // OpenAction: GoTo → JavaScript → URI; the JavaScript in the middle is spliced out.
-  const tail = uri('https://example.com/tail');
+  // OpenAction: GoTo → JavaScript → GoTo → URI. The JavaScript in the middle is spliced out, and
+  // the URI goes because an OpenAction keeps navigation only.
+  const tail = action('GoTo', {
+    D: ctx.obj([page.ref, N('Fit')]),
+    Next: uri('https://example.com/open'),
+  });
   const middle = action('JavaScript', { JS: PDFString.of('x'), Next: tail });
   const goTo = action('GoTo', { D: ctx.obj([page.ref, N('Fit')]), Next: middle });
   doc.catalog.set(N('OpenAction'), goTo);
@@ -39,7 +55,13 @@ async function hostile() {
       Rect: [20, 0, 30, 10],
       A: action('JavaScript', {
         JS: PDFString.of('z'),
-        Next: ctx.obj([uri('https://example.com/a'), js(), uri('https://example.com/b')]),
+        Next: ctx.obj([
+          uri('https://example.com/a'),
+          js(),
+          uri('javascript:alert(1)'),
+          uri('file:///etc/passwd'),
+          uri('mailto:someone@example.com'),
+        ]),
       }),
     }),
   );
@@ -55,7 +77,17 @@ async function hostile() {
   );
   const media = ctx.register(ctx.obj({ Type: 'Annot', Subtype: 'RichMedia', Rect: [0, 0, 1, 1] }));
   const screen = ctx.register(ctx.obj({ Type: 'Annot', Subtype: 'Screen', Rect: [0, 0, 1, 1] }));
-  for (const a of [link, branching, widget, media, screen]) page.node.addAnnot(a);
+  const threeD = ctx.register(ctx.obj({ Type: 'Annot', Subtype: '3D', Rect: [0, 0, 1, 1] }));
+  const unknown = ctx.register(ctx.obj({ Type: 'Annot', Rect: [0, 0, 1, 1] }));
+  const attachment = ctx.register(
+    ctx.obj({ Type: 'Annot', Subtype: 'FileAttachment', Rect: [0, 0, 1, 1], A: js() }),
+  );
+  const badLink = ctx.register(
+    ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 1, 1], A: uri(' javascript:alert(2)') }),
+  );
+  for (const a of [link, branching, widget, media, screen, threeD, unknown, attachment, badLink]) {
+    page.node.addAnnot(a);
+  }
 
   // Outlines: an item with a JavaScript /A and a child with a GoTo; siblings form a cycle.
   const outlines = ctx.obj({ Type: 'Outlines' });
@@ -72,7 +104,7 @@ async function hostile() {
     Parent: outlinesRef,
   });
   const firstRef = ctx.register(first);
-  const second = ctx.obj({ Title: PDFString.of('second'), A: action('Launch'), Next: firstRef });
+  const second = ctx.obj({ Title: PDFString.of('second'), A: action('Launch') });
   const secondRef = ctx.register(second);
   first.set(N('Next'), secondRef);
   outlines.set(N('First'), firstRef);
@@ -83,7 +115,21 @@ async function hostile() {
     N('Names'),
     ctx.obj({ JavaScript: ctx.obj({ Names: [PDFString.of('a'), js()] }) }),
   );
-  return { doc, page, link, branching, widget, goTo, tail, first, second, child, loopUri };
+  return {
+    doc,
+    page,
+    link,
+    branching,
+    widget,
+    goTo,
+    tail,
+    first,
+    second,
+    child,
+    loopUri,
+    attachment,
+    badLink,
+  };
 }
 
 const lookup = (doc: PDFDocument, ref: PDFRef) => doc.context.lookup(ref, PDFDict);
@@ -96,38 +142,80 @@ describe('stripActiveContent', () => {
     stripActiveContent(h.doc);
     const { doc } = h;
 
-    // OpenAction: GoTo, then the URI that followed the removed JavaScript.
+    // OpenAction: GoTo, then the GoTo that followed the removed JavaScript, and no URI.
     const open = doc.catalog.get(N('OpenAction'));
     expect(open).toBe(h.goTo);
     expect(lookup(doc, h.goTo).get(N('Next'))).toBe(h.tail);
+    expect(lookup(doc, h.tail).get(N('Next'))).toBeUndefined();
 
     // The cyclic link keeps its URI and loses the JavaScript and the loop.
     const link = lookup(doc, h.link);
     expect(sOf(doc, link.get(N('A')))).toBe('/URI');
     expect(h.loopUri.get(N('Next'))).toBeUndefined();
 
-    // The branching link: the JavaScript head is replaced by the first URI, the second follows.
+    // The branching link: the JavaScript head is replaced by the https URI, the mailto URI
+    // follows; the javascript: and file: URIs are dropped.
     const branching = lookup(doc, h.branching);
     const head = doc.context.lookup(branching.get(N('A')), PDFDict);
     expect(head.get(N('URI'))?.toString()).toContain('example.com/a');
-    expect(sOf(doc, head.get(N('Next')))).toBe('/URI');
+    const after = doc.context.lookup(head.get(N('Next')), PDFDict);
+    expect(after.get(N('URI'))?.toString()).toContain('mailto:');
+    expect(after.get(N('Next'))).toBeUndefined();
+    expect(lookup(doc, h.badLink).get(N('A'))).toBeUndefined();
 
     // The widget loses both its ImportData action and its SubmitForm additional action.
     const widget = lookup(doc, h.widget);
     expect(widget.get(N('A'))).toBeUndefined();
     expect(widget.get(N('AA'))).toBeUndefined();
 
-    // Outline items: JavaScript and Launch removed, the child's GoTo kept, the cycle terminates.
+    // Outline items: JavaScript and Launch removed, the child's GoTo kept.
     expect(h.first.get(N('A'))).toBeUndefined();
     expect(h.second.get(N('A'))).toBeUndefined();
     expect(sOf(doc, h.child.get(N('A')))).toBe('/GoTo');
 
-    // RichMedia and Screen annotations are gone; the others remain.
+    // Only passive annotations remain: two links, the widget, the attachment (without its
+    // action) and the bad link; RichMedia, Screen, 3D and the untyped one are gone.
     const annots = h.page.node.lookup(N('Annots'), PDFArray);
-    expect(annots.size()).toBe(3);
+    expect(annots.size()).toBe(5);
+    expect(lookup(doc, h.attachment).get(N('A'))).toBeUndefined();
     expect(doc.catalog.get(N('AA'))).toBeUndefined();
     expect(h.page.node.get(N('AA'))).toBeUndefined();
     expect(doc.catalog.lookup(N('Names'), PDFDict).get(N('JavaScript'))).toBeUndefined();
+  });
+
+  it('removes an outline tree that is cyclic, too deep or too large (fail closed)', async () => {
+    const outline = async (build: (doc: PDFDocument) => PDFDict) => {
+      const doc = await PDFDocument.create();
+      doc.addPage();
+      const root = doc.context.obj({ Type: 'Outlines' });
+      root.set(N('First'), doc.context.register(build(doc)));
+      doc.catalog.set(N('Outlines'), doc.context.register(root));
+      stripActiveContent(doc);
+      return doc.catalog.get(N('Outlines'));
+    };
+    // A cycle among siblings.
+    expect(
+      await outline((doc) => {
+        const a = doc.context.obj({ Title: PDFString.of('a') });
+        a.set(N('Next'), doc.context.register(a));
+        return a;
+      }),
+    ).toBeUndefined();
+    // Nesting deeper than the cap.
+    expect(
+      await outline((doc) => {
+        let item = doc.context.obj({ Title: PDFString.of('leaf') });
+        for (let i = 0; i < 70; i++) {
+          item = doc.context.obj({
+            Title: PDFString.of(`l${i}`),
+            First: doc.context.register(item),
+          });
+        }
+        return item;
+      }),
+    ).toBeUndefined();
+    // A shallow, well-formed outline survives.
+    expect(await outline((doc) => doc.context.obj({ Title: PDFString.of('ok') }))).toBeDefined();
   });
 
   it('keeps a destination-array OpenAction and removes an unsafe one entirely', async () => {
@@ -138,6 +226,13 @@ describe('stripActiveContent', () => {
     stripActiveContent(doc);
     expect(doc.catalog.get(N('OpenAction'))).toBe(dest);
     doc.catalog.set(N('OpenAction'), doc.context.obj({ S: 'JavaScript', JS: PDFString.of('1') }));
+    stripActiveContent(doc);
+    expect(doc.catalog.get(N('OpenAction'))).toBeUndefined();
+    // A URI is never kept as an OpenAction, even with a safe scheme.
+    doc.catalog.set(
+      N('OpenAction'),
+      doc.context.obj({ S: 'URI', URI: PDFString.of('https://example.com') }),
+    );
     stripActiveContent(doc);
     expect(doc.catalog.get(N('OpenAction'))).toBeUndefined();
   });
@@ -168,5 +263,20 @@ describe('removeEncryptionLeftovers', () => {
     );
     removeEncryptionLeftovers(doc);
     expect(doc.context.lookup(ref)).toBeUndefined();
+  });
+});
+
+describe('isSafeAction', () => {
+  it('decodes UTF-16 URIs and allows only http, https and mailto', async () => {
+    const doc = await PDFDocument.create();
+    const uri = (value: PDFString | PDFHexString) => doc.context.obj({ S: 'URI', URI: value });
+    expect(isSafeAction(uri(PDFHexString.fromText('https://example.com/ü')))).toBe(true);
+    expect(isSafeAction(uri(PDFString.of('MAILTO:a@b.c')))).toBe(true);
+    expect(isSafeAction(uri(PDFHexString.fromText('JavaScript:alert(1)')))).toBe(false);
+    expect(isSafeAction(uri(PDFString.of('https://exa mple.com')))).toBe(false);
+    expect(isSafeAction(uri(PDFString.of('ftp://example.com')))).toBe(false);
+    expect(isSafeAction(doc.context.obj({ S: 'URI' }))).toBe(false);
+    expect(isSafeAction(doc.context.obj({ S: 'GoTo' }))).toBe(true);
+    expect(isSafeAction(doc.context.obj({}))).toBe(false);
   });
 });
