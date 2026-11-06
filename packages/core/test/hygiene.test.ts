@@ -7,11 +7,14 @@ import {
   PDFHexString,
   PDFName,
   PDFString,
+  type PDFObject,
   type PDFRef,
 } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import {
+  chainSatisfies,
   isSafeAction,
+  isSafeOpenAction,
   removeEncryptionLeftovers,
   stripActiveContent,
 } from '../src/export/hygiene.ts';
@@ -143,15 +146,16 @@ describe('stripActiveContent', () => {
     const { doc } = h;
 
     // OpenAction: GoTo, then the GoTo that followed the removed JavaScript, and no URI.
-    const open = doc.catalog.get(N('OpenAction'));
-    expect(open).toBe(h.goTo);
-    expect(lookup(doc, h.goTo).get(N('Next'))).toBe(h.tail);
-    expect(lookup(doc, h.tail).get(N('Next'))).toBeUndefined();
+    const open = doc.catalog.lookup(N('OpenAction'), PDFDict);
+    expect(sOf(doc, doc.catalog.get(N('OpenAction')))).toBe('/GoTo');
+    const second = doc.context.lookup(open.get(N('Next')), PDFDict);
+    expect(second.get(N('S'))?.toString()).toBe('/GoTo');
+    expect(second.get(N('Next'))).toBeUndefined();
 
     // The cyclic link keeps its URI and loses the JavaScript and the loop.
     const link = lookup(doc, h.link);
     expect(sOf(doc, link.get(N('A')))).toBe('/URI');
-    expect(h.loopUri.get(N('Next'))).toBeUndefined();
+    expect(doc.context.lookup(link.get(N('A')), PDFDict).get(N('Next'))).toBeUndefined();
 
     // The branching link: the JavaScript head is replaced by the https URI, the mailto URI
     // follows; the javascript: and file: URIs are dropped.
@@ -181,6 +185,57 @@ describe('stripActiveContent', () => {
     expect(doc.catalog.get(N('AA'))).toBeUndefined();
     expect(h.page.node.get(N('AA'))).toBeUndefined();
     expect(doc.catalog.lookup(N('Names'), PDFDict).get(N('JavaScript'))).toBeUndefined();
+  });
+
+  it('keeps slots independent when they share an action (copy on write)', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage();
+    const ctx = doc.context;
+    const uri = ctx.register(ctx.obj({ S: 'URI', URI: PDFString.of('https://example.com') }));
+    const shared = ctx.register(
+      ctx.obj({ S: 'GoTo', D: ctx.obj([page.ref, N('Fit')]), Next: uri }),
+    );
+    // The link is cleaned after the OpenAction and would splice the URI back into the shared GoTo.
+    const js = ctx.register(
+      ctx.obj({ S: 'JavaScript', JS: PDFString.of('x'), Next: ctx.obj([shared, uri]) }),
+    );
+    doc.catalog.set(N('OpenAction'), shared);
+    const link = ctx.register(
+      ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 1, 1], A: js }),
+    );
+    page.node.addAnnot(link);
+    stripActiveContent(doc);
+    const chain = (start: unknown) => {
+      const types: string[] = [];
+      let d: PDFDict | undefined = doc.context.lookup(start as PDFRef) as PDFDict;
+      while (d && types.length < 10) {
+        types.push(String(d.get(N('S'))));
+        const next: PDFObject | undefined = d.get(N('Next'));
+        const resolved: PDFObject | undefined =
+          next === undefined ? undefined : doc.context.lookup(next);
+        d =
+          resolved instanceof PDFArray
+            ? (doc.context.lookup(resolved.get(0)) as PDFDict)
+            : (resolved as PDFDict | undefined);
+      }
+      return types;
+    };
+    expect(chain(doc.catalog.get(N('OpenAction')))).toEqual(['/GoTo']);
+    expect(chain(lookup(doc, link).get(N('A')))).toContain('/URI');
+  });
+
+  it('removes an /OpenAction that a final check finds unsafe', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage();
+    // A destination array is not an action dictionary and stays; an unsafe dict chain goes.
+    const bad = doc.context.obj({
+      S: 'GoTo',
+      Next: doc.context.obj([doc.context.obj({ S: 'URI' })]),
+    });
+    doc.catalog.set(N('OpenAction'), doc.context.register(bad));
+    stripActiveContent(doc);
+    expect(sOf(doc, doc.catalog.get(N('OpenAction')))).toBe('/GoTo');
+    expect(doc.catalog.lookup(N('OpenAction'), PDFDict).get(N('Next'))).toBeUndefined();
   });
 
   it('removes an outline tree that is cyclic, too deep or too large (fail closed)', async () => {
@@ -278,5 +333,20 @@ describe('isSafeAction', () => {
     expect(isSafeAction(doc.context.obj({ S: 'URI' }))).toBe(false);
     expect(isSafeAction(doc.context.obj({ S: 'GoTo' }))).toBe(true);
     expect(isSafeAction(doc.context.obj({}))).toBe(false);
+  });
+});
+
+describe('chainSatisfies', () => {
+  it('re-checks a whole chain, cycles included', async () => {
+    const doc = await PDFDocument.create();
+    const ctx = doc.context;
+    const a = ctx.obj({ S: 'GoTo' });
+    const aRef = ctx.register(a);
+    a.set(N('Next'), ctx.obj([aRef]));
+    expect(chainSatisfies(ctx, aRef, isSafeOpenAction)).toBe(true);
+    a.set(N('Next'), ctx.obj({ S: 'URI', URI: PDFString.of('https://x.y') }));
+    expect(chainSatisfies(ctx, aRef, isSafeOpenAction)).toBe(false);
+    expect(chainSatisfies(ctx, aRef, isSafeAction)).toBe(true);
+    expect(chainSatisfies(ctx, ctx.obj([]), isSafeAction)).toBe(false);
   });
 });

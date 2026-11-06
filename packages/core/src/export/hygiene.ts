@@ -6,6 +6,7 @@ import {
   PDFDict,
   PDFName,
   PDFHexString,
+  PDFInvalidObject,
   PDFRawStream,
   PDFStream,
   PDFString,
@@ -71,7 +72,7 @@ export const isSafeAction: ActionPolicy = (action) => {
 };
 
 /** `/OpenAction` runs without a click, so only navigation survives there. */
-const isSafeOpenAction: ActionPolicy = (action) => actionType(action) === 'GoTo';
+export const isSafeOpenAction: ActionPolicy = (action) => actionType(action) === 'GoTo';
 
 /** `/Next` as a list of raw entries (a single action or an array of them). */
 function nextEntries(ctx: PDFContext, dict: PDFDict): PDFObject[] {
@@ -89,8 +90,9 @@ function setNext(dict: PDFDict, entries: PDFObject[], ctx: PDFContext) {
 
 /**
  * Cleans one action and its `/Next` chain. Returns the actions that remain in its place, in
- * order: the action itself when the policy allows it, otherwise its cleaned successors spliced
- * in. Cycles are cut at the first repeated action.
+ * order: a fresh copy of the action when the policy allows it, otherwise its cleaned successors
+ * spliced in. Copies (copy on write) mean that cleaning one slot under one policy never rewires
+ * an action dictionary another slot shares. Cycles are cut at the first repeated action.
  */
 function cleanChain(
   ctx: PDFContext,
@@ -103,8 +105,9 @@ function cleanChain(
   visited.add(dict);
   const next = nextEntries(ctx, dict).flatMap((entry) => cleanChain(ctx, entry, safe, visited));
   if (!safe(dict)) return next;
-  setNext(dict, next, ctx);
-  return [raw];
+  const copy = dict.clone(ctx);
+  setNext(copy, next, ctx);
+  return [ctx.register(copy)];
 }
 
 /** Cleans the action stored under `key`; deletes the entry when nothing allowed remains. */
@@ -119,9 +122,25 @@ function cleanActionSlot(ctx: PDFContext, owner: PDFDict, key: string, safe = is
   const [head, ...rest] = kept;
   owner.set(N(key), head!);
   if (rest.length > 0) {
+    // The head is this slot's own copy, so appending to its /Next touches nothing shared.
     const headDict = ctx.lookup(head!) as PDFDict;
     setNext(headDict, [...nextEntries(ctx, headDict), ...rest], ctx);
   }
+}
+
+/** Whether every action reachable from `raw` satisfies `safe` (a fail-closed re-check). */
+export function chainSatisfies(ctx: PDFContext, raw: PDFObject, safe: ActionPolicy): boolean {
+  const seen = new Set<PDFDict>();
+  const pending = [raw];
+  while (pending.length > 0) {
+    const dict = ctx.lookup(pending.pop()!);
+    if (!(dict instanceof PDFDict)) return false;
+    if (seen.has(dict)) continue;
+    if (seen.size >= MAX_CHAIN || !safe(dict)) return false;
+    seen.add(dict);
+    pending.push(...nextEntries(ctx, dict));
+  }
+  return true;
 }
 
 /**
@@ -185,7 +204,24 @@ export function stripActiveContent(doc: PDFDocument): void {
       cleanActionSlot(ctx, dict, 'A');
     }
   }
+  // Fail closed: whatever happened above, an /OpenAction dictionary must be navigation only.
+  const open = catalog.get(N('OpenAction'));
+  if (
+    open !== undefined &&
+    ctx.lookup(open) instanceof PDFDict &&
+    !chainSatisfies(ctx, open, isSafeOpenAction)
+  ) {
+    catalog.delete(N('OpenAction'));
+  }
 }
+
+const latin1 = (bytes: Uint8Array) => {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 4096) {
+    out += String.fromCharCode(...bytes.subarray(i, i + 4096));
+  }
+  return out;
+};
 
 /**
  * The fork decrypts objects but keeps the original's cross-reference streams and encryption
@@ -194,6 +230,13 @@ export function stripActiveContent(doc: PDFDocument): void {
  */
 export function removeEncryptionLeftovers(doc: PDFDocument): void {
   for (const [ref, object] of doc.context.enumerateIndirectObjects()) {
+    // A cross-reference stream the fork tried to decrypt does not parse and is kept verbatim.
+    if (object instanceof PDFInvalidObject) {
+      const bytes = new Uint8Array(object.sizeInBytes());
+      object.copyBytesInto(bytes, 0);
+      if (/\/(XRef|Encrypt)\b/.test(latin1(bytes))) doc.context.delete(ref);
+      continue;
+    }
     const dict =
       object instanceof PDFStream ? object.dict : object instanceof PDFDict ? object : undefined;
     if (!dict) continue;

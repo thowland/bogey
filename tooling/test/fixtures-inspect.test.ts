@@ -1,44 +1,56 @@
 // Inspection against every manifest entry (spec §6, implementation plan Sprint 2 tests).
 import { describe, expect, it } from 'vitest';
-import { inspectPdf } from '../../packages/core/src/index.ts';
-import { UNDECRYPTABLE, fixture, manifest, present } from './pdfCore.ts';
+import { inspectPdf, type PdfInfo } from '../../packages/core/src/index.ts';
+import { UNDECRYPTABLE, fixture, manifest, present, type Entry } from './pdfCore.ts';
 
 const available = manifest.filter(present);
 const skipped = manifest.length - available.length;
 
+async function inspect(e: Entry): Promise<PdfInfo> {
+  const r = await inspectPdf(fixture(e.path), e.password ? { password: e.password } : {});
+  if (!r.ok) throw new Error(JSON.stringify(r.problems));
+  return r.value;
+}
+
 describe('inspectPdf on the fixture manifest', () => {
-  it(`covers every available fixture (${skipped} fetched fixtures absent)`, () => {
-    expect(available.filter((e) => e.path.startsWith('fixtures/vendored/')).length).toBeGreaterThan(30);
+  it(`covers every available fixture (fetched fixtures absent: ${String(skipped)})`, () => {
+    expect(available.filter((e) => e.path.startsWith('fixtures/vendored/')).length).toBeGreaterThan(
+      30,
+    );
   });
 
   for (const e of available) {
-    it(e.path, async () => {
-      const r = await inspectPdf(fixture(e.path), e.password ? { password: e.password } : {});
-      if (!r.ok) throw new Error(JSON.stringify(r.problems));
-      const info = r.value;
+    it(`reads the structure of ${e.path}`, async () => {
+      const info = await inspect(e);
       expect(info.encrypted).toBe(e.encrypted);
       expect(info.pageCount).toBe(e.pageCount);
       expect(info.pages).toHaveLength(e.pageCount);
-      expect([...new Set(info.pages.map((p) => p.rotate))].sort()).toEqual([...new Set(e.rotation)].sort());
-      if (e.cropOrigin) expect(info.pages.some((p) => p.view[0] !== 0 || p.view[1] !== 0)).toBe(true);
-      if (UNDECRYPTABLE.has(e.path)) {
-        expect(info).toMatchObject({ decryptable: false, formType: 'flat', fields: [] });
-        return;
-      }
-      expect(info.decryptable).toBe(true);
+      expect([...new Set(info.pages.map((p) => p.rotate))].sort()).toEqual(
+        [...new Set(e.rotation)].sort(),
+      );
+      expect(info.pages.some((p) => p.view[0] !== 0 || p.view[1] !== 0)).toBe(e.cropOrigin);
+      expect(info.decryptable).toBe(!UNDECRYPTABLE.has(e.path));
+    });
+  }
+
+  for (const e of available.filter((x) => !UNDECRYPTABLE.has(x.path))) {
+    it(`classifies ${e.path}`, async () => {
+      const info = await inspect(e);
       // The manifest records the document's class; a hybrid form is filled as an AcroForm (§6.2).
       expect(info.xfa).toBe(e.xfa);
       expect(info.formType).toBe(e.xfa === 'hybrid' ? 'acroform' : e.formType);
-      if (info.formType === 'acroform') expect(info.fields.length).toBeGreaterThan(0);
-      else expect(info.fields).toEqual([]);
-      for (const kind of e.fieldKinds ?? []) {
-        expect(info.fields.map((f) => f.kind), kind).toContain(kind);
-      }
-      for (const f of info.fields) {
-        expect(f.widgets.length).toBeGreaterThan(0);
-        for (const w of f.widgets) expect(w.page).toBeLessThan(info.pageCount);
-      }
+      expect(info.fields.length > 0).toBe(info.formType === 'acroform');
+      expect(info.fields.map((f) => f.kind)).toEqual(expect.arrayContaining(e.fieldKinds ?? []));
+      const widgets = info.fields.flatMap((f) => f.widgets);
+      expect(widgets.every((w) => w.page < info.pageCount)).toBe(true);
+      expect(info.fields.every((f) => f.widgets.length > 0)).toBe(true);
       expect(info.fields.map((f) => f.tabOrder)).toEqual(info.fields.map((_, i) => i));
+    });
+  }
+
+  for (const e of available.filter((x) => UNDECRYPTABLE.has(x.path))) {
+    it(`routes ${e.path} to page images (spec §9.5)`, async () => {
+      expect(await inspect(e)).toMatchObject({ decryptable: false, formType: 'flat', fields: [] });
     });
   }
 
@@ -64,7 +76,7 @@ describe('inspectPdf on the fixture manifest', () => {
     ['fixtures/fetched/irs/fw4.pdf', 48],
     ['fixtures/fetched/irs/f1040.pdf', 199],
   ];
-  for (const [path, count] of IRS.filter(([p]) => present({ path: p } as never))) {
+  for (const [path, count] of IRS.filter(([p]) => present({ path: p } as Entry))) {
     it(`finds the IRS form's fields: ${path}`, async () => {
       const r = await inspectPdf(fixture(path));
       if (!r.ok) throw new Error('inspect');

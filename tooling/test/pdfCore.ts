@@ -45,13 +45,16 @@ export interface TextItem {
   transform: number[];
 }
 
+/** Opens a document with pdf.js; call `close()` when done. */
 export async function openWithPdfjs(bytes: Uint8Array, password?: string) {
-  return getDocument({
+  const task = getDocument({
     data: bytes.slice(),
     ...(password !== undefined ? { password } : {}),
     isEvalSupported: false,
     verbosity: VerbosityLevel.ERRORS,
-  }).promise;
+  });
+  const pdf = await task.promise;
+  return Object.assign(pdf, { close: () => task.destroy() });
 }
 
 /** Text items per page, in PDF user space. */
@@ -66,7 +69,7 @@ export async function textItems(bytes: Uint8Array, password?: string): Promise<T
       ),
     );
   }
-  await pdf.destroy();
+  await pdf.close();
   return pages;
 }
 
