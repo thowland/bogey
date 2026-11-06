@@ -191,7 +191,7 @@ test('a hybrid XFA form fills its AcroForm fields @all-engines', async ({ page }
 // Interim export check: Sprint 4's export dialog is not on master yet, so the values the app's
 // controls hold are exported through core in Node, exactly as the pdf worker does. The combined
 // MVP scenario through the real download replaces this once both sprints have merged.
-test('the filled values export flattened', async ({ page }) => {
+test('the filled values export flattened @all-engines', async ({ page }) => {
   await page.goto('/');
   await openFixture(page, 'vendored/generated/acroform-all.pdf');
   await renderedPage(page, 1);
