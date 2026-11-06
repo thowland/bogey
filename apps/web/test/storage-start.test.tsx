@@ -167,9 +167,11 @@ describe('restore on load (D7)', () => {
     expect(askPassword).toHaveBeenCalledWith({ code: 'pdf.password-required' });
     expect(useDocumentStore.getState()).toMatchObject({ status: 'ready', password: 'bogey' });
     expect(useViewStore.getState().page).toBe(2);
-    // The password is never stored.
-    const stored = JSON.stringify(await repository.get('documents', 'a'));
-    expect(stored).not.toContain('bogey');
+    // The password is never stored, and neither is an image of page 1.
+    await settle(repository);
+    const saved = await repository.get('documents', 'a');
+    expect(JSON.stringify(saved)).not.toContain('bogey');
+    expect(saved!.thumbnail).toBeNull();
   });
 
   it('shows the recent list when the password is cancelled, and does not ask next time', async () => {
@@ -401,6 +403,15 @@ describe('the recent list (D6)', () => {
     await userEvent.click(screen.getByRole('button', { name: /^b\.pdf/ }));
     await waitFor(() => expect(useDocumentStore.getState().id).toBe('b'));
     unmount();
+  });
+
+  it('shows a placeholder, not page 1, for a password-protected document', async () => {
+    const repository = await repo();
+    await seed(repository, record('locked', { encrypted: true }));
+    await startSession(repository, { services: () => services(), controller: quiet });
+    const { container } = render(<RecentDocuments />);
+    expect(screen.getByRole('img', { name: 'Password-protected' })).toBeInTheDocument();
+    expect(container.querySelector('img')).toBeNull();
   });
 
   it('says what will appear when there is nothing saved', () => {

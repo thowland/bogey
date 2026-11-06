@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import { LIMITS, TIMING } from '../config.ts';
 import { EMPTY_EDIT_STATE } from '../core-bridge/model.ts';
 import type { PdfDisplayDocument } from '../pdfjs/types.ts';
+import { deriveSealingKey, newSalt, sealEdits, unsealEdits } from '../security/sealing.ts';
 import { useDocumentStore, type DocumentState } from './document.ts';
 import { useEditsStore } from './edits.ts';
 import {
@@ -34,7 +35,9 @@ export type SessionNotice =
   /** Storage is nearly full, so the document opened without being saved (M3). */
   | 'memory-only'
   /** A saved record could not be read and was removed (migrations, spec §10.5). */
-  | 'record-unreadable';
+  | 'record-unreadable'
+  /** A password-protected document's sealed edits did not decrypt; it opened without them. */
+  | 'edits-unreadable';
 
 export interface SessionState {
   /** Saved documents, most recently updated first (D6). */
@@ -48,6 +51,8 @@ export interface SessionState {
   persistRequested: boolean;
   /** False after a failed Clear everything: nothing more is written (spec §10.5). */
   saving: boolean;
+  /** A document opened before storage was ready; its bytes are saved once it is. */
+  deferred: string | null;
 }
 
 export interface SessionActions {
@@ -69,6 +74,7 @@ const initial: SessionState = {
   firstRunNoticeDismissed: false,
   persistRequested: false,
   saving: true,
+  deferred: null,
 };
 
 const byUpdated = (a: DocumentRecord, b: DocumentRecord) => b.updatedAt - a.updatedAt;
@@ -117,6 +123,13 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const isArrayBuffer = (value: unknown) =>
   Object.prototype.toString.call(value) === '[object ArrayBuffer]';
 
+const isSealed = (value: unknown) =>
+  isObject(value) &&
+  value.v === 1 &&
+  isArrayBuffer(value.salt) &&
+  isArrayBuffer(value.iv) &&
+  isArrayBuffer(value.data);
+
 const isZoom = (value: unknown) =>
   value === 'fit-width' ||
   value === 'fit-page' ||
@@ -135,7 +148,8 @@ function isDocumentRecord(value: Record<string, unknown>): boolean {
     (value.thumbnail === null || isArrayBuffer(value.thumbnail)) &&
     isZoom(value.zoom) &&
     isObject(value.fieldValues) &&
-    Array.isArray(value.overlays)
+    Array.isArray(value.overlays) &&
+    (value.sealed === undefined || isSealed(value.sealed))
   );
 }
 
@@ -339,7 +353,12 @@ export async function persistOpenedBytes(
   deps: PersistDeps = browserPersistDeps,
 ): Promise<boolean> {
   const repository = sharedRepository();
-  if (!repository || repository.mode !== 'persistent' || !session().saving) return false;
+  if (!repository) {
+    // Storage is still opening: the session controller saves it once it is ready.
+    if (useStorageStore.getState().mode === 'opening') session().update({ deferred: id });
+    return false;
+  }
+  if (repository.mode !== 'persistent' || !session().saving) return false;
   if (!withinBudget(await deps.estimate(), bytes.byteLength)) {
     session().setNotice('memory-only');
     return false;
@@ -365,6 +384,7 @@ export async function persistOpenedBytes(
 
 /** Undoes persistOpenedBytes when the open is cancelled or fails. */
 export async function forgetOpenedBytes(id: string): Promise<void> {
+  if (session().deferred === id) session().update({ deferred: null });
   const repository = sharedRepository();
   if (!repository) return;
   await deleteDocuments(repository, [id]);
@@ -378,6 +398,10 @@ export interface SessionControllerOptions {
   makeThumbnail?(display: PdfDisplayDocument): Promise<ArrayBuffer | null>;
   /** `navigator.storage.persist()` (M4). */
   requestPersistence?(): Promise<boolean>;
+  /** Derives a password-protected document's sealing key (security/sealing.ts). */
+  deriveKey?(password: string, salt: ArrayBuffer): Promise<CryptoKey>;
+  /** Saves bytes opened before storage was ready (defaults to persistOpenedBytes). */
+  persistBytes?(id: string, name: string, bytes: Uint8Array): Promise<boolean>;
   /** Receives `visibilitychange`; its `visibilityState` is read. */
   document?: Pick<Document, 'addEventListener' | 'removeEventListener' | 'visibilityState'>;
   /** Receives `pagehide`. */
@@ -392,16 +416,37 @@ export interface SessionController {
   /** The next document to become ready with this id reopens with this record's state (D7). */
   expect(record: DocumentRecord): void;
   forget(id: string): void;
-  /** Writes the active record now if a write is pending. */
+  /** Writes the active record now if a write is pending, and resolves when written. */
   flush(): Promise<void>;
 }
+
+/** A password-protected document's sealing: its salt and its key, once derived. */
+interface Sealing {
+  id: string;
+  salt: ArrayBuffer;
+  key: Promise<CryptoKey>;
+  /** Settles once the saved edits have been restored (or found unreadable). */
+  restored: Promise<void>;
+  done: boolean;
+}
+
+/** The record without its edits, as stored for a password-protected document. */
+const withoutEdits = (value: DocumentRecord): DocumentRecord => ({
+  ...value,
+  fieldValues: {},
+  overlays: [],
+});
 
 export function createSessionController(options: SessionControllerOptions): SessionController {
   const { repository } = options;
   const now = options.now ?? (() => Date.now());
   const debounceMs = options.debounceMs ?? TIMING.autosaveMs;
+  const deriveKey = options.deriveKey ?? ((password, salt) => deriveSealingKey(password, salt));
+  const persistBytes =
+    options.persistBytes ?? ((id, name, bytes) => persistOpenedBytes(id, name, bytes));
   const expected = new Map<string, DocumentRecord>();
   let record: DocumentRecord | null = null;
+  let sealing: Sealing | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let applying = false;
   let unsubscribers: (() => void)[] = [];
@@ -428,14 +473,55 @@ export function createSessionController(options: SessionControllerOptions): Sess
     };
   };
 
+  /**
+   * What is stored for `value`: as is, or for a password-protected document with its edits sealed.
+   * If sealing fails, the edits are left out and the last sealed edits are kept (fail closed).
+   */
+  const storable = async (value: DocumentRecord, seal: Sealing | null) => {
+    if (!seal || seal.id !== value.id) return value;
+    try {
+      const key = await seal.key;
+      const edits = { fieldValues: value.fieldValues, overlays: value.overlays };
+      return { ...withoutEdits(value), sealed: await sealEdits(key, seal.salt, value.id, edits) };
+    } catch (error) {
+      console.error('The edits could not be sealed, so they were not saved', error);
+      return withoutEdits(value);
+    }
+  };
+
+  const put = async (value: DocumentRecord, seal: Sealing | null) => {
+    const stored = await storable(value, seal);
+    if (seal?.id === value.id && stored.sealed && record?.id === value.id) {
+      record = { ...record, sealed: stored.sealed };
+    }
+    await repository.put('documents', stored);
+  };
+
   const write = (): Promise<void> => {
     cancelTimer();
     if (!record || !canSave(record.id)) return writing;
-    record = snapshot(record);
-    const value = record;
-    session().upsertRecent(value);
-    writing = repository
-      .put('documents', value)
+    const seal = sealing?.id === record.id ? sealing : null;
+    let next: () => Promise<void>;
+    if (seal && !seal.done) {
+      // Until the saved edits are back, the edit state on screen is not the document's: wait, so
+      // a write never seals an empty state over them.
+      const id = record.id;
+      next = async () => {
+        await seal.restored;
+        if (!record || record.id !== id) return;
+        record = snapshot(record);
+        session().upsertRecent(withoutEdits(record));
+        await put(record, seal);
+      };
+    } else {
+      record = snapshot(record);
+      const value = record;
+      session().upsertRecent(seal ? withoutEdits(value) : value);
+      next = () => put(value, seal);
+    }
+    // Writes are chained, so a slower seal never lets an older state land last.
+    writing = writing
+      .then(next)
       .catch((error: unknown) => console.error('The document could not be saved', error));
     return writing;
   };
@@ -472,29 +558,87 @@ export function createSessionController(options: SessionControllerOptions): Sess
 
   const addThumbnail = async (id: string, display: PdfDisplayDocument) => {
     const thumbnail = await options.makeThumbnail!(display).catch(() => null);
-    if (!thumbnail || record?.id !== id) return;
+    if (!thumbnail || record?.id !== id || record.encrypted) return;
     record = { ...record, thumbnail };
     await write();
   };
 
-  const opened = (state: DocumentState) => {
+  const isActive = (id: string) => useDocumentStore.getState().id === id && record?.id === id;
+
+  /**
+   * Derives the key of a document opened with a password, keeps it in the document session, and
+   * restores the sealed edits of a saved record. Edits that do not decrypt are not loaded, with a
+   * notice; nothing falls back to plaintext.
+   */
+  const startSealing = (id: string, password: string, info: PdfInfo, saved?: DocumentRecord) => {
+    const salt = saved?.sealed?.salt ?? newSalt();
+    const key = deriveKey(password, salt);
+    let finish!: () => void;
+    const seal: Sealing = {
+      id,
+      salt,
+      key,
+      restored: new Promise<void>((resolve) => (finish = resolve)),
+      done: false,
+    };
+    sealing = seal;
+    const untouched = useEditsStore.getState().present;
+    const restore = async () => {
+      let derived: CryptoKey;
+      try {
+        derived = await key;
+      } catch (error) {
+        console.error('The sealing key could not be derived', error);
+        if (saved?.sealed && isActive(id)) session().setNotice('edits-unreadable');
+        return;
+      }
+      if (!isActive(id)) return;
+      useDocumentStore.getState().update({ sealingKey: derived });
+      if (!saved?.sealed) return;
+      const edits = await unsealEdits(derived, id, saved.sealed);
+      if (!isActive(id)) return;
+      if (!edits) {
+        session().setNotice('edits-unreadable');
+        return;
+      }
+      // Edits made while the key was being derived are kept rather than overwritten.
+      if (useEditsStore.getState().present !== untouched) return;
+      applying = true;
+      try {
+        useEditsStore.getState().load(edits, info);
+      } finally {
+        applying = false;
+      }
+    };
+    void restore().finally(() => {
+      seal.done = true;
+      finish();
+    });
+  };
+
+  const opened = (state: DocumentState, { catchUp = false } = {}) => {
     const id = state.id!;
     const info = state.info as PdfInfo;
     const saved = expected.get(id);
     expected.delete(id);
-    const restored: DocumentEditState = saved
-      ? { fieldValues: saved.fieldValues, overlays: saved.overlays }
-      : EMPTY_EDIT_STATE;
-    applying = true;
-    try {
-      if (saved) {
-        const lastPage = Math.min(Math.max(0, saved.lastPage), Math.max(0, info.pageCount - 1));
-        useViewStore.getState().setPage(lastPage);
-        useViewStore.getState().setZoom(saved.zoom);
+    const protectedByPassword = info.encrypted && state.password !== null;
+    // A password-protected record's plaintext edits are never used (fail closed).
+    const restored: DocumentEditState =
+      saved && !protectedByPassword
+        ? { fieldValues: saved.fieldValues, overlays: saved.overlays }
+        : EMPTY_EDIT_STATE;
+    if (!catchUp) {
+      applying = true;
+      try {
+        if (saved) {
+          const lastPage = Math.min(Math.max(0, saved.lastPage), Math.max(0, info.pageCount - 1));
+          useViewStore.getState().setPage(lastPage);
+          useViewStore.getState().setZoom(saved.zoom);
+        }
+        useEditsStore.getState().load(restored, info);
+      } finally {
+        applying = false;
       }
-      useEditsStore.getState().load(restored, info);
-    } finally {
-      applying = false;
     }
     const base = saved ?? provisionalRecord(id, state.name ?? 'document.pdf', now());
     record = {
@@ -504,17 +648,26 @@ export function createSessionController(options: SessionControllerOptions): Sess
       formType: info.formType,
       xfa: info.xfa,
       encrypted: info.encrypted,
+      // Page 1 of a password-protected document is protected content: no image of it is kept
+      // where the password is not needed to read it (security review, Sprint 6).
+      ...(info.encrypted ? { thumbnail: null } : {}),
     };
-    if (!canSave(id)) {
-      void setActive(null);
-      return;
-    }
+    sealing = null;
+    if (protectedByPassword) startSealing(id, state.password!, info, saved);
     void (async () => {
+      if (session().deferred === id && state.bytes) {
+        session().update({ deferred: null });
+        await persistBytes(id, record?.name ?? 'document.pdf', state.bytes);
+      }
+      if (!canSave(id)) {
+        await setActive(null);
+        return;
+      }
       await write();
       await setActive(id);
       await evict(id);
       await firstSave();
-      if (!record?.thumbnail && options.makeThumbnail && state.display) {
+      if (!info.encrypted && !record?.thumbnail && options.makeThumbnail && state.display) {
         await addThumbnail(id, state.display);
       }
     })().catch((error: unknown) => console.error('Saving the opened document failed', error));
@@ -524,6 +677,7 @@ export function createSessionController(options: SessionControllerOptions): Sess
     if (record && timer !== null) void write();
     cancelTimer();
     record = null;
+    sealing = null;
     void setActive(null);
   };
 
@@ -536,10 +690,10 @@ export function createSessionController(options: SessionControllerOptions): Sess
     }
   };
 
+  const flushNow = () => (timer !== null ? write() : writing);
   const onHidden = () => {
     if (options.document?.visibilityState === 'hidden') void flushNow();
   };
-  const flushNow = () => (timer !== null ? write() : writing);
 
   return {
     start() {
@@ -561,12 +715,18 @@ export function createSessionController(options: SessionControllerOptions): Sess
         doc?.removeEventListener('visibilitychange', onHidden);
         win?.removeEventListener('pagehide', flushNow);
       });
+      // A document opened while storage was still opening is saved now, edits and all.
+      const current = useDocumentStore.getState();
+      if (current.status === 'ready' && current.id && session().deferred === current.id) {
+        opened(current, { catchUp: true });
+      }
     },
     stop() {
       cancelTimer();
       for (const unsubscribe of unsubscribers) unsubscribe();
       unsubscribers = [];
       record = null;
+      sealing = null;
     },
     expect(saved) {
       expected.set(saved.id, saved);
@@ -574,6 +734,6 @@ export function createSessionController(options: SessionControllerOptions): Sess
     forget(id) {
       expected.delete(id);
     },
-    flush: flushNow,
+    flush: () => flushNow(),
   };
 }

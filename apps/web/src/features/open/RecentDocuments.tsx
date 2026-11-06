@@ -30,6 +30,18 @@ function Thumbnail({ png }: { png: ArrayBuffer | null }) {
   );
 }
 
+/** Stands in for page 1 of a password-protected document, which is never stored as an image. */
+function Locked() {
+  return (
+    <span className={`${styles.thumb} ${styles.locked}`} role="img" aria-label="Password-protected">
+      <span aria-hidden="true">🔒</span>
+      <span className={styles.lockedText} aria-hidden="true">
+        Password-protected
+      </span>
+    </span>
+  );
+}
+
 function details(record: DocumentRecord): string {
   const pages =
     record.pageCount > 0
@@ -42,7 +54,7 @@ function RecentItem({ record }: { record: DocumentRecord }) {
   return (
     <li className={styles.item}>
       <button type="button" className={styles.open} onClick={() => void openSaved(record.id)}>
-        <Thumbnail png={record.thumbnail} />
+        {record.encrypted ? <Locked /> : <Thumbnail png={record.thumbnail} />}
         <span className={styles.text}>
           <span className={styles.name}>{record.name}</span>
           <span className={styles.details}>{details(record)}</span>

@@ -321,6 +321,25 @@ describe('the session controller (M1, D7)', () => {
     expect(makeThumbnail).toHaveBeenCalledOnce();
   });
 
+  it('never stores a thumbnail of an encrypted document (security review)', async () => {
+    await persistOpenedBytes('e', 'e.pdf', new Uint8Array([37]), deps());
+    // Even a record that somehow carried one loses it.
+    controller.expect(record('e', { encrypted: true, thumbnail: new ArrayBuffer(4) }));
+    useDocumentStore.getState().update({
+      status: 'ready',
+      id: 'e',
+      name: 'e.pdf',
+      info: { ...info(3), encrypted: true },
+      display: fakeDocument(3),
+    });
+    await settle(repository);
+    expect(makeThumbnail).not.toHaveBeenCalled();
+    expect(await repository.get('documents', 'e')).toMatchObject({
+      encrypted: true,
+      thumbnail: null,
+    });
+  });
+
   it('shows the first-save notice and asks for persistent storage once (M4, spec §11.7)', async () => {
     await open('a');
     expect(useSessionStore.getState().firstSaveNotice).toBe(true);
@@ -343,9 +362,12 @@ describe('the session controller (M1, D7)', () => {
     vi.advanceTimersByTime(300);
     useViewStore.getState().setZoom(1.5);
     useEditsStore.getState().load({ fieldValues: { name: 'Jane' }, overlays: [overlay] });
+    const tick = () => new Promise((resolve) => setImmediate(resolve));
     vi.advanceTimersByTime(499);
+    await tick();
     expect(put).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
+    await tick();
     expect(put).toHaveBeenCalledOnce();
     vi.useRealTimers();
     await settle(repository);
@@ -363,19 +385,23 @@ describe('the session controller (M1, D7)', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const put = vi.spyOn(repository, 'put');
     useViewStore.getState().setPage(2);
+    const written = async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+      return put.mock.calls.length;
+    };
     doc.dispatchEvent(new Event('visibilitychange'));
-    expect(put).not.toHaveBeenCalled();
+    expect(await written()).toBe(0);
     doc.visibilityState = 'hidden';
     doc.dispatchEvent(new Event('visibilitychange'));
-    expect(put).toHaveBeenCalledOnce();
+    expect(await written()).toBe(1);
     // Nothing pending: no second write.
     win.dispatchEvent(new Event('pagehide'));
-    expect(put).toHaveBeenCalledOnce();
+    expect(await written()).toBe(1);
     useViewStore.getState().setZoom('fit-page');
     win.dispatchEvent(new Event('pagehide'));
-    expect(put).toHaveBeenCalledTimes(2);
+    expect(await written()).toBe(2);
     vi.advanceTimersByTime(1000);
-    expect(put).toHaveBeenCalledTimes(2);
+    expect(await written()).toBe(2);
     vi.useRealTimers();
     await settle(repository);
     expect(await repository.get('documents', 'a')).toMatchObject({ lastPage: 2, zoom: 'fit-page' });

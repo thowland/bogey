@@ -18,6 +18,10 @@ const NOTICES: Record<SessionNotice, { tone: 'info' | 'warning'; text: string }>
     tone: 'warning',
     text: 'Opened, but not saved on this device. Storage for this site is nearly full, so this document will be lost when the tab closes. Deleting documents from the recent list frees space.',
   },
+  'edits-unreadable': {
+    tone: 'warning',
+    text: 'The entries saved for this password-protected document could not be unlocked, so it opened without them. The document itself is unchanged.',
+  },
   'record-unreadable': {
     tone: 'info',
     text: 'A saved document could not be read, so it was removed from this browser.',
