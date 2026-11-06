@@ -8,6 +8,7 @@ import {
   PDFHexString,
   PDFInvalidObject,
   PDFRawStream,
+  PDFRef,
   PDFStream,
   PDFString,
   type PDFContext,
@@ -337,4 +338,45 @@ export function removeEncryptionLeftovers(doc: PDFDocument): void {
     const isEncrypt = get(dict, 'Filter') === N('Standard') && dict.has(N('O')) && dict.has(N('U'));
     if (isXref || isEncrypt) doc.context.delete(ref);
   }
+}
+
+/**
+ * pdf-lib writes every object in its context, referenced or not, so actions and annotations that
+ * stripActiveContent unlinked would still be in the saved file (found in Sprint 9: the hostile
+ * fixture's export still contained JavaScript and Launch objects that no reader could reach).
+ * Keeps only what is reachable from the trailer's /Root and /Info and drops the rest, which
+ * also drops replaced appearance streams and parsed object streams. Call after doc.flush(), so
+ * fonts and images embedded during export already exist. Returns the number of objects dropped.
+ */
+export function pruneUnreachable(doc: PDFDocument): number {
+  const ctx = doc.context;
+  const reachable = new Set<string>();
+  const pending: PDFObject[] = [];
+  const { Root, Info } = ctx.trailerInfo;
+  if (Root) pending.push(Root);
+  if (Info) pending.push(Info);
+  while (pending.length > 0) {
+    const object = pending.pop()!;
+    if (object instanceof PDFRef) {
+      const key = object.toString();
+      if (reachable.has(key)) continue;
+      reachable.add(key);
+      const target = ctx.lookup(object);
+      if (target) pending.push(target);
+    } else if (object instanceof PDFDict) {
+      for (const value of object.values()) pending.push(value);
+    } else if (object instanceof PDFArray) {
+      for (let i = 0; i < object.size(); i++) pending.push(object.get(i));
+    } else if (object instanceof PDFStream) {
+      pending.push(object.dict);
+    }
+  }
+  let dropped = 0;
+  for (const [ref] of ctx.enumerateIndirectObjects()) {
+    if (!reachable.has(ref.toString())) {
+      ctx.delete(ref);
+      dropped++;
+    }
+  }
+  return dropped;
 }

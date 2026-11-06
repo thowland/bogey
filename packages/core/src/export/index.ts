@@ -16,7 +16,7 @@ import type { FieldDescriptor } from '../model/fields.ts';
 import { fail, ok, type Result } from '../result.ts';
 import { nonWinAnsi, replaceNonWinAnsi } from '../text/index.ts';
 import { fillAndFlatten } from './fields.ts';
-import { removeEncryptionLeftovers, stripActiveContent } from './hygiene.ts';
+import { pruneUnreachable, removeEncryptionLeftovers, stripActiveContent } from './hygiene.ts';
 import { drawOverlays } from './overlays.ts';
 
 export { CHECK_GLYPH, X_MARK } from './overlays.ts';
@@ -99,6 +99,9 @@ async function save(
 ): Promise<Result<ExportOutput, ExportProblem>> {
   await stage('saving');
   removeEncryptionLeftovers(doc);
+  // Embed pending fonts and images first, so pruning sees everything the pages reference.
+  await doc.flush();
+  pruneUnreachable(doc);
   const bytes = await doc.save({ useObjectStreams: true, updateFieldAppearances: false });
   await stage('checking');
   if (!(await verify(bytes, pageCount))) return fail({ code: 'export.verify-failed' });
