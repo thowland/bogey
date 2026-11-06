@@ -12,7 +12,7 @@ Bogey is a browser-only PDF fill-and-sign tool: open a PDF, fill its form fields
 
 ## Status
 
-Sprint 0 (foundations): workspace, tooling, contracts, persistence base, fixtures and hosting are in place; feature directories hold placeholders that later sprints replace. Update this section as sprints land.
+Waves 0 and 1 are merged (tags `sprint-00` to `sprint-03`): the shell, viewer (open, render, thumbnails, zoom, password), PDF core (geometry, inspection, edits and undo, export with active-content stripping, decryption, pdf worker) and signature capture (draw with Pencil pressure, upload with background removal, library). Wave 2 (Sprints 4–6, the MVP) is next; the plan's §4 lists what it builds on. Update this section as sprints land.
 
 ## Commands
 
@@ -25,7 +25,7 @@ pnpm lint                      # eslint + prettier --check + dependency-cruiser 
 pnpm test:coverage             # Vitest, merged coverage, thresholds 80% on all four metrics
 pnpm test:e2e                  # Playwright against the production build
 pnpm gate                      # lint → test:coverage → test:browsers → build → test:e2e
-pnpm demo:export               # (Sprint 2) filled/overlaid exports of each fixture class into out/demo/
+pnpm demo:export               # filled/overlaid exports of each fixture class into out/demo/ (fetch fixtures first for IRS/qpdf)
 pnpm infra:deploy              # create/update the CloudFormation stack (infra/bogey.yaml)
 pnpm deploy:site               # gate, build, publish master to bogey.beta-site.us, check live headers
 
@@ -64,11 +64,14 @@ E2E runs against the production build via `vite preview`. Ports come from `scrip
 - **`apps/web` (`@bogey/web`)**: React 19 + Vite + zustand.
   - `pdfjs-dist` may be imported only in `src/pdfjs/`; pdf.js is used for display only.
   - Core runtime code is reached only through `src/core-bridge/` and `src/workers/pdf.worker.ts` (comlink). Type imports from `@bogey/core` are fine anywhere; constants go through `core-bridge/model.ts`.
-  - `core-bridge/pdf.ts` holds the `PdfBridge` contract; until Sprint 2 it is a stub that treats every document as flat.
+  - `core-bridge/pdf.ts` runs the pdf worker (`workers/pdf.worker.ts` bootstrap, `workers/pdfWorkerApi.ts`) behind the `PdfBridge` contract; in jsdom it falls back to the stub. Other bridges: `model.ts` (constants), `geometry.ts`, `text.ts`, `history.ts`, `image.ts`.
+  - pdf.js lives in `src/pdfjs/`: one long-lived `PDFWorker`, a shared render queue, and `AnnotationMode.ENABLE_FORMS` with a canvas map for AcroForm documents (spec §10.3).
   - One zustand store per file in `src/state/`, each owned by one sprint.
   - `state/persistence.ts` owns IndexedDB (`bogey` database) behind a `Repository` with an ordered queue, in-memory fallback and fail-closed clear; original PDF bytes live in their own `documentBytes` store. Binary values are stored as `ArrayBuffer`, never `Blob` (WebKit aborts Blob writes intermittently).
   - App limits live in `src/config.ts`; problem codes and their user text in `src/ui/messages.ts`.
 - The pdf-lib fork deletes a document's XFA whenever `getForm()` runs (saving included) unless loaded with `preserveXFA: true`.
+- Browser-mode tests: list every package they import in `vitest.config.ts` (`CORE_BROWSER_DEPS` / `WEB_BROWSER_DEPS`), or Vite re-optimizes mid-run on a cold cache and the post-merge gate fails. Tests under the E2E violation fixture take no screenshots (WebKit reports Playwright's injected style).
+- WebKit reports a `style-src-attr` violation whenever a native `<select>` is created; see spec §16.4 before using one.
 - Coordinates: overlays store an anchor in unrotated PDF points and dimensions in the upright (as-viewed) frame; export draws with `rotate = page /Rotate` (spec §5.3).
 
 ## Security constraints

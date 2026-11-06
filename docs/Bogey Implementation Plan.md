@@ -470,7 +470,20 @@ The MVP is reached when S4 and S5 have both merged. It covers the spec's core pa
 
 ---
 
-## 4. Running a wave
+## 4. Wave 1 outcomes and notes for wave 2
+
+Wave 0 and wave 1 closed on 2026-11-06: `sprint-00`, `sprint-01`, `sprint-02`, `sprint-03`, plus `fix/live-check-post`, `chore/vitest-optimize-deps` and `chore/wave1-docs-bridges`. Spike results are in `docs/spikes/` and folded into the spec.
+
+What wave 2 builds on, and what it must pick up:
+
+- **Shared bridges.** `core-bridge/geometry.ts` and `core-bridge/text.ts` exist for S4, S5 and S7; extend them rather than adding parallel modules. `core-bridge/history.ts` backs `state/edits.ts`, which now has `seal()` and takes an edit context (fields and page count) on `load`.
+- **Viewer state.** `state/document.ts` has `display` (the loaded pdf.js document) and `state/view.ts` has `renderedZoom` (the zoom actually shown, with fit-width and fit-page resolved). Overlay and field layers position themselves from `renderedZoom`.
+- **S4**: `PdfBridge.exportPageImages` exists in core and the bridge; S4's export dialog uses it when `PdfInfo.decryptable` is false, supplying pages rendered by pdf.js with `rotation: 0` over the view box (spec §9.5).
+- **S5**: the canvas leaves out every form widget except signature fields and push buttons, so the field layer draws all values, read-only ones included (F8). The notice for documents over 300 pages (spec §6.1) is S5's, alongside the XFA notices. Dropdown and list fields wait on the `<select>` decision (spec §16.4); until it is made, S5 builds every other control first. The IRS W-9 is a good end-to-end fixture: check that "Other" and 3b export checked.
+- **S6**: inserts its persist step into `features/open/openSteps.ts` after `read`, with an `undo` that deletes the record; owns the "pdf.js accepted the password, core rejected it" case (route to page images, spec §9.6).
+- **Test infrastructure.** Browser-mode tests list their dependencies in `vitest.config.ts` (`CORE_BROWSER_DEPS`, `WEB_BROWSER_DEPS`); a new import in a browser test needs an entry, or the post-merge gate on master reloads mid-run. WebKit reports a `style-src-elem` violation when Playwright takes a screenshot, so tests under the violation fixture take none. Worker progress callbacks are awaited in the worker, so stage order is deterministic.
+
+## 5. Running a wave
 
 1. When a wave starts, the main checkout is on `master` with the previous wave fully merged and deployed.
 2. Start one worktree per sprint: `scripts/worktree.sh start sprint/NN-name`. Open a Claude Code session in each, with the prompt: "Run Sprint NN of `docs/Bogey Implementation Plan.md`. Stay within the paths the sprint owns; ask before touching anything else."
@@ -481,7 +494,7 @@ When a session discovers it needs a contract change (a new field on a core type,
 
 ---
 
-## 5. Risks
+## 6. Risks
 
 | Risk | Where it bites | Mitigation in the plan |
 | --- | --- | --- |
