@@ -3,7 +3,9 @@
 // controls underneath keep working, and only overlays (and their handles) can be clicked; a
 // capture-phase listener on the sheet still records the last point clicked for snippets (N2) and
 // clears the selection when the click was not on an overlay. In a placement tool the layer takes
-// every click on the page, and a tap places the tool's overlay.
+// every click on the page, and a tap places the tool's overlay. A tap is one pointer, pressed and
+// released within 6 CSS px and 400 ms; a pan, or a second finger joining (a pinch), places
+// nothing (spec §7.2).
 import { useEffect, useRef, type PointerEvent, type RefObject } from 'react';
 import { useDocumentStore } from '../../state/document.ts';
 import { useEditsStore } from '../../state/edits.ts';
@@ -24,7 +26,8 @@ export function OverlayLayer() {
   const editingId = useOverlayUi((state) => state.editingId);
   const draft = useOverlayUi((state) => state.draft);
   const root = useRef<HTMLDivElement>(null);
-  const down = useRef<PointerSample | null>(null);
+  const down = useRef<(PointerSample & { id: number }) | null>(null);
+  const pressed = useRef(new Set<number>());
 
   useLastPoint(root, geometry !== undefined && zoom !== null);
 
@@ -47,21 +50,32 @@ export function OverlayLayer() {
       onPointerDown={
         placing
           ? (event) => {
-              if (event.button === 0) down.current = local(event);
+              // A primary pointer starts afresh, so a release we never saw cannot block taps.
+              if (event.isPrimary) pressed.current.clear();
+              pressed.current.add(event.pointerId);
+              down.current =
+                event.button === 0 && pressed.current.size === 1
+                  ? { ...local(event), id: event.pointerId }
+                  : null;
             }
           : undefined
       }
       onPointerUp={
         placing
           ? (event) => {
+              pressed.current.delete(event.pointerId);
               const start = down.current;
+              if (start?.id !== event.pointerId) return;
               down.current = null;
               const end = local(event);
-              if (start && isTap(start, end)) placeAt(end, zoom);
+              if (!isTap(start, end)) return;
+              placeAt(end, zoom);
+              if (event.pointerType === 'touch' || event.pointerType === 'pen') swallowGhostClick();
             }
           : undefined
       }
-      onPointerCancel={() => {
+      onPointerCancel={(event) => {
+        pressed.current.delete(event.pointerId);
         down.current = null;
       }}
     >
@@ -77,6 +91,22 @@ export function OverlayLayer() {
       ))}
     </div>
   );
+}
+
+/** How long after a touch placement the browser's compatibility click may still arrive. */
+const GHOST_CLICK_MS = 600;
+
+/**
+ * After a finger or Pencil tap, the browser sends a click to whatever is under the tap once it
+ * ends, and by then that is the new overlay with its Delete button: the click is dropped.
+ */
+function swallowGhostClick() {
+  const swallow = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  window.addEventListener('click', swallow, { capture: true, once: true });
+  setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), GHOST_CLICK_MS);
 }
 
 /**

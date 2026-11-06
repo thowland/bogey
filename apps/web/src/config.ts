@@ -15,6 +15,12 @@ export const LIMITS = Object.freeze({
   storageQuotaShare: 0.8,
   /** iOS Safari's per-canvas limit (spec §10.3). */
   maxCanvasPixels: 16_777_216,
+  /**
+   * V6: the hidden neighbors render at most this many pixels (2048 × 2048), so at high zoom the
+   * three page canvases stay well inside iPad Safari's total canvas memory (about 384 MB on
+   * recent iPads). A neighbor that becomes the current page re-renders at full sharpness.
+   */
+  neighborCanvasPixels: 4_194_304,
   /** V6: pages either side of the current one that keep a full canvas. */
   renderedNeighbors: 1,
   /** spec §10.3: pages further away than this are cleaned up in pdf.js. */
@@ -49,6 +55,8 @@ export const TIMING = Object.freeze({
   revokeDownloadUrlAfterMs: 60_000,
   /** spec §7.4. */
   coalesceIdleMs: 1_000,
+  /** V4: Ctrl+wheel has no end event; the zoom commits after this pause. */
+  wheelZoomSettleMs: 200,
 });
 
 export const CANONICAL_URL = 'https://bogey.beta-site.us';
