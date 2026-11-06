@@ -8,3 +8,4 @@ export * from './model/document.ts';
 export type * from './model/export.ts';
 export * from './model/library.ts';
 export * from './model/text.ts';
+export * from './image/index.ts';
