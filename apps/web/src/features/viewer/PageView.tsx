@@ -1,6 +1,7 @@
-// The page area (V1, V3, V6, spec §10.3, §10.4): one page at a time, at the chosen zoom. The page
-// on either side is rendered too, hidden, so paging is immediate; pages further away hold no canvas,
-// and pdf.js frees what it holds for pages more than five away.
+// The page area (V1, V3, V4, V6, spec §10.3, §10.4): one page at a time, at the chosen zoom. The
+// page on either side is rendered too, hidden and at a capped resolution, so paging is immediate;
+// pages further away hold no canvas, and pdf.js frees what it holds for pages more than five away.
+// Pinch, trackpad and Ctrl+wheel zoom are handled by gestures/.
 import { useEffect, useRef } from 'react';
 import { LIMITS } from '../../config.ts';
 import type { AnnotationRendering, PdfDisplayDocument } from '../../pdfjs/index.ts';
@@ -8,6 +9,7 @@ import { useDocumentStore } from '../../state/document.ts';
 import type { Zoom } from '../../state/persistence.ts';
 import { useViewStore } from '../../state/view.ts';
 import { FieldLayer } from '../fields/index.ts';
+import { usePinchZoom } from './gestures/index.ts';
 import { OverlayLayer } from '../overlays/index.ts';
 import { useElementSize, usePage } from './hooks.ts';
 import { annotationRendering, pagesAround } from './pageModel.ts';
@@ -26,6 +28,7 @@ export function PageView() {
   const zoom = useViewStore((state) => state.zoom);
   const area = useRef<HTMLDivElement>(null);
   const areaSize = useElementSize(area);
+  usePinchZoom(area, zoom, display !== null);
 
   useEffect(() => {
     display?.releaseFar(page, LIMITS.cleanupDistance);
@@ -82,6 +85,7 @@ function PageSheet({ display, index, current, zoom, area, annotations }: PageShe
     annotations,
     current ? PRIORITY.current : PRIORITY.neighbor,
     styles.canvas!,
+    current ? LIMITS.maxCanvasPixels : LIMITS.neighborCanvasPixels,
   );
 
   useEffect(() => {
