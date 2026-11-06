@@ -483,6 +483,16 @@ What wave 2 builds on, and what it must pick up:
 - **S6**: inserts its persist step into `features/open/openSteps.ts` after `read`, with an `undo` that deletes the record; owns the "pdf.js accepted the password, core rejected it" case (route to page images, spec §9.6).
 - **Test infrastructure.** Browser-mode tests list their dependencies in `vitest.config.ts` (`CORE_BROWSER_DEPS`, `WEB_BROWSER_DEPS`); a new import in a browser test needs an entry, or the post-merge gate on master reloads mid-run. WebKit reports a `style-src-elem` violation when Playwright takes a screenshot, so tests under the violation fixture take none. Worker progress callbacks are awaited in the worker, so stage order is deterministic.
 
+### Wave 2 outcomes and notes for wave 3
+
+Wave 2 closed on 2026-11-06 (`sprint-04`, `sprint-05`, `sprint-06`): the MVP is live, and reload, restore, the recent list and sealed edits for encrypted documents work.
+
+- **S7** adds a **Close document** control to the toolbar (next to Open) that returns to the empty state and the recent list; today there is no way back to the list while a document is open. The session controller already stops tracking a document when it closes. S7 also reads `targetField` (set by S5) and places snippet overlays at `lastPoint` (set by S4).
+- **S8** owns the viewer and overlay handle changes as planned; S4's overlay layer passes pointer events through to fields in select mode, so tap detection must keep that.
+- **S9** precaches `/pdfjs/wasm/` and `/pdfjs/iccs/` (spec §11.5) and adds the hostile-PDF fixture.
+- **S10** checks the page-image export (spec §9.5) on a rotated page by hand: pages are described from pdf.js's displayed sizes, so overlays on a rotated page may land off their on-screen position. No shipped fixture exercises it.
+- `acroform-all.pdf` has a 51 pt font baked into `multiline1` by pdf-lib; regenerate it with a normal size when a sprint next touches fixtures.
+
 ## 5. Running a wave
 
 1. When a wave starts, the main checkout is on `master` with the previous wave fully merged and deployed.
