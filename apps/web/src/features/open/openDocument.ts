@@ -41,6 +41,8 @@ export async function openDocument(
   file: OpenableFile,
   services: OpenServices = defaultServices(),
   steps: readonly OpenStep[] = OPEN_STEPS,
+  /** A saved document's id, when reopening it (Sprint 6, D7). */
+  id: string = newId(),
 ): Promise<void> {
   const current = ++generation;
   cancelPasswordPrompt();
@@ -49,7 +51,7 @@ export async function openDocument(
   store.update({ status: 'opening', name: file.name });
 
   const session: OpenSession = {
-    id: newId(),
+    id,
     name: file.name,
     file,
     bytes: null,

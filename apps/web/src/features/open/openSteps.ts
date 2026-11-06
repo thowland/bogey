@@ -6,6 +6,8 @@ import type { PdfInfo, Problem } from '@bogey/core';
 import { LIMITS } from '../../config.ts';
 import type { PdfBridge } from '../../core-bridge/pdf.ts';
 import type { PdfDisplayDocument, PdfjsLoader } from '../../pdfjs/index.ts';
+import { forgetOpenedBytes, persistOpenedBytes } from '../../state/session.ts';
+import { pageImageInfo } from '../storage/undecryptable.ts';
 import { readPdf, type FileLike } from './accept.ts';
 
 export interface OpenSession {
@@ -54,6 +56,21 @@ export const readStep: OpenStep = {
 };
 
 /**
+ * Step 3 (D5, Sprint 6): the bytes are saved before inspection, so a crash while parsing still
+ * leaves the file recoverable. Undo deletes what was written.
+ */
+export const persistStep: OpenStep = {
+  name: 'persist',
+  async run(session) {
+    await persistOpenedBytes(session.id, session.name, session.bytes!);
+    return NEXT;
+  },
+  async undo(session) {
+    await forgetOpenedBytes(session.id);
+  },
+};
+
+/**
  * Steps 4–5: inspect in the pdf worker and load into pdf.js, in parallel, asking for the password
  * until it is right or the user cancels (D3).
  */
@@ -71,6 +88,20 @@ export const inspectAndLoadStep: OpenStep = {
         session.info = inspected.value;
         session.display = loaded.value;
         session.password = password ?? null;
+        return NEXT;
+      }
+      // pdf.js accepted the password the user gave and core did not (spec §9.6): show it with
+      // pdf.js and export page images (spec §9.5), rather than asking again for a password that
+      // works. Without a password the user is asked first, as for any encrypted file.
+      if (
+        password !== undefined &&
+        loaded.ok &&
+        !inspected.ok &&
+        inspected.problems.every(isPasswordProblem)
+      ) {
+        session.info = await pageImageInfo(loaded.value);
+        session.display = loaded.value;
+        session.password = password;
         return NEXT;
       }
       if (loaded.ok) await loaded.value.destroy();
@@ -105,7 +136,12 @@ export const limitsStep: OpenStep = {
   },
 };
 
-export const OPEN_STEPS: readonly OpenStep[] = [readStep, inspectAndLoadStep, limitsStep];
+export const OPEN_STEPS: readonly OpenStep[] = [
+  readStep,
+  persistStep,
+  inspectAndLoadStep,
+  limitsStep,
+];
 
 /** Undoes completed steps, latest first. A failing undo is logged and the rest still run. */
 export async function undoSteps(
