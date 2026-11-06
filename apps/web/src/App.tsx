@@ -7,7 +7,8 @@ import { useStorageStore } from './state/storage.ts';
 import { useViewStore, type PanelTab, type Screen } from './state/view.ts';
 import { ExportButton } from './features/export/index.ts';
 import { DocumentNotices, FieldsPanel } from './features/fields/index.ts';
-import { EmptyState, OpenButton } from './features/open/index.ts';
+import { ShortcutsHelp } from './features/help/index.ts';
+import { CloseButton, EmptyState, OpenButton } from './features/open/index.ts';
 import { ToolButtons, UndoRedo } from './features/overlays/index.ts';
 import { AboutPage, HelpPage, PrivacyPage } from './features/pages/index.ts';
 import { SettingsMenu } from './features/settings/index.ts';
@@ -48,6 +49,7 @@ export function App() {
       <header className={styles.toolbar}>
         <span className={styles.brand}>Bogey</span>
         <OpenButton />
+        <CloseButton />
         <ToolButtons />
         <UndoRedo />
         <span className={styles.spacer} />
@@ -66,6 +68,7 @@ export function App() {
             </Button>
           ))}
         </nav>
+        <ShortcutsHelp />
         <SettingsMenu />
         <Button
           variant="quiet"
