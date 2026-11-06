@@ -12,7 +12,7 @@ Bogey is a browser-only PDF fill-and-sign tool: open a PDF, fill its form fields
 
 ## Status
 
-Waves 0–2 are merged (tags `sprint-00` to `sprint-06`); the MVP is live: open, view, fill fields, place text, checks, dates and signatures, undo, export a flattened PDF, autosave and restore, recent documents, sealed edits for encrypted documents. Wave 3 (Sprints 7–9) is next; the plan's §4 lists what it builds on. Update this section as sprints land.
+Waves 0–3 are merged (tags `sprint-00` to `sprint-09`): the full v1 feature set is live, including snippets and settings, touch and iPad gestures, offline use through the service worker, and the security suite. Sprint 10 (release: Help/About/Privacy, accessibility, performance, acceptance on Mac and iPad) is next. Update this section as sprints land.
 
 ## Commands
 
@@ -43,7 +43,7 @@ pnpm exec vitest run --project core:node -t "unique"                  # one test
 pnpm exec playwright test smoke --project webkit                      # one E2E spec (needs pnpm build)
 ```
 
-E2E runs against the production build via `vite preview`. Ports come from `scripts/ports.mjs`, derived from the checkout path, so worktrees can run the gate at the same time (main checkout: preview 4173, E2E 4174). Chromium runs every spec; Firefox and WebKit run specs whose title contains `@all-engines`. Every E2E test fails on any CSP or Trusted Types violation or page error (fixture in `e2e/helpers.ts`); the expected-fail self-test in `e2e/security.spec.ts` shows as ✘ but counts as passing.
+E2E runs against the production build via `vite preview`. Concurrent sessions share the scratchpad, so name logs per sprint (`gate-sprint-NN.log`). iPad review uses the deployed site: plain HTTP over the LAN lacks `crypto.randomUUID`. Ports come from `scripts/ports.mjs`, derived from the checkout path, so worktrees can run the gate at the same time (main checkout: preview 4173, E2E 4174). Chromium runs every spec; Firefox and WebKit run specs whose title contains `@all-engines`. Every E2E test fails on any CSP or Trusted Types violation or page error (fixture in `e2e/helpers.ts`); the expected-fail self-test in `e2e/security.spec.ts` shows as ✘ but counts as passing.
 
 ## Workflow rules
 

@@ -1,6 +1,6 @@
 # Bogey – Technical Specification
 
-Status: Draft 3 · 2026-11-06 (waves 1 and 2 folded in)
+Status: Draft 4 · 2026-11-06 (waves 1–3 folded in)
 Companion to: `docs/VISION.md` and `docs/REQUIREMENTS.md` (referred to below as "the vision" and "the requirements")
 
 This document describes how Bogey is built: the repository layout, the boundary between the pure document library and the web application, the geometry model, form handling, overlays, signatures, export, persistence, the service worker, security, testing and release. Requirement IDs (D1, F3, X5 and so on) refer to the requirements. Where the requirements leave a choice open, this document makes one; where it departs from the requirements, the departure is listed in §16 with its reason so it can be confirmed or reversed. Appendix A maps every requirement ID to the section that satisfies it.
@@ -681,6 +681,7 @@ As in Mulligan's §10.5: private versioned S3 bucket behind CloudFront with Orig
 | Document expiry | 30 days without edits |
 | Storage use before falling back to memory-only | 80% of `storage.estimate().quota` |
 | Canvas pixels per page | 16,777,216 |
+| Canvas pixels per neighbor page (pre-rendered, not shown) | 4,194,304 (2048 × 2048) |
 | Fully rendered pages | current ± 1 (V6) |
 | Thumbnail cache | 60 |
 | Signature upload | 20 MB, decoded long edge ≤ 2,000 px |
