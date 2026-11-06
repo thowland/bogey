@@ -416,7 +416,7 @@ The MVP is reached when S4 and S5 have both merged. It covers the spec's core pa
 - **Playwright** with the iPad Pro descriptor in WebKit: pinch changes the app zoom and not the page scale; a pan places nothing; a tap places an overlay; handles measure at least 44 px; the narrow layout renders without errors at 800 px.
 
 **Exit criteria**
-- The gesture, memory and layout items of the iPad checklist pass on a real iPad against `pnpm preview` reached over the LAN (none of them needs a secure context). The full checklist is rerun on `bogey.beta-site.us` after the merge, and anything that fails there goes to a `fix/…` branch.
+- The iPad checklist is run on a real iPad against `bogey.beta-site.us` after the merge (plain HTTP over the LAN is not a secure context, so `crypto.randomUUID` is missing and documents do not open; the iOS Simulator on `localhost` works for quick checks). Anything that fails goes to a `fix/…` branch.
 
 **Review**
 - On the iPad: pinch to zoom a page without the toolbar zooming, pan around, tap to place text, drag a signature by its handle with a finger, open the 20-page fixture and page through it all without Safari reloading the tab.
@@ -492,6 +492,15 @@ Wave 2 closed on 2026-11-06 (`sprint-04`, `sprint-05`, `sprint-06`): the MVP is 
 - **S9** precaches `/pdfjs/wasm/` and `/pdfjs/iccs/` (spec §11.5) and adds the hostile-PDF fixture.
 - **S10** checks the page-image export (spec §9.5) on a rotated page by hand: pages are described from pdf.js's displayed sizes, so overlays on a rotated page may land off their on-screen position. No shipped fixture exercises it.
 - `acroform-all.pdf` has a 51 pt font baked into `multiline1` by pdf-lib; regenerate it with a normal size when a sprint next touches fixtures.
+
+### Wave 3 outcomes and notes for Sprint 10
+
+Wave 3 closed on 2026-11-06 (`sprint-07`, `sprint-08`, `sprint-09`), followed by `fix/prune-unreferenced-objects` (exports no longer carry unlinked hostile objects) and `chore/wave3-docs-axe` (adds `@axe-core/playwright` for the accessibility pass).
+
+- Two hands-on checks are left for the maintainer and belong to Sprint 10's acceptance run: `docs/ipad-checklist.md` on a real iPad, and airplane mode on the iPad (load once, go offline, open from Files, fill, download).
+- The service worker's kill switch is documented in CLAUDE.md. While it is deployed the app re-registers it on each load, which is harmless; the next normal deploy replaces it.
+- Concurrent sessions overwrote each other's logs in the shared scratchpad. Close and gate logs must use per-sprint names (`close-sprint-NN.log`).
+- The page-image export on rotated pages still needs its manual check (wave 2 notes).
 
 ## 5. Running a wave
 
