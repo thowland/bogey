@@ -115,3 +115,105 @@ export async function inkCoverage(page: Page, number: number): Promise<number> {
       return inked / sampled;
     });
 }
+
+// ── fields (Sprint 5) ──
+
+/** The field layer of the page on screen (F2). */
+export function fieldLayer(page: Page) {
+  return page.getByRole('group', { name: /^Form fields on page \d+$/ });
+}
+
+/** The Fields panel (F7), opened on its tab. */
+export async function fieldsPanel(page: Page) {
+  const panel = page.getByRole('complementary', { name: /fields, snippets and signatures/i });
+  await panel.getByRole('tab', { name: 'Fields' }).click();
+  return panel;
+}
+
+import { createRequire } from 'node:module';
+import type { FieldValue } from '../packages/core/src/index.ts';
+
+/** The part of pdf-lib the export check uses, loaded from core's own dependency. */
+interface PdfLibSubset {
+  PDFDocument: {
+    load(bytes: Uint8Array): Promise<{
+      getForm(): { getFields(): unknown[] };
+      context: { enumerateIndirectObjects(): [unknown, unknown][] };
+    }>;
+  };
+  PDFRawStream: abstract new (...args: never[]) => object;
+  decodePDFRawStream(stream: object): { decode(): Uint8Array };
+}
+
+const corePdfLib = createRequire(new URL('../packages/core/package.json', import.meta.url))(
+  '@cantoo/pdf-lib',
+) as PdfLibSubset;
+
+/**
+ * Interim export check until the export dialog (Sprint 4) is on master: exports a fixture with the
+ * given field values through core, as the pdf worker does, and returns the bytes.
+ */
+export async function exportInNode(
+  path: string,
+  fieldValues: Record<string, FieldValue>,
+): Promise<Uint8Array> {
+  const core = await import('../packages/core/src/index.ts');
+  const bytes = new Uint8Array(fixture(path));
+  const info = await core.inspectPdf(bytes);
+  if (!info.ok) throw new Error(`inspect failed: ${JSON.stringify(info.problems)}`);
+  const out = await core.exportPdf({
+    bytes,
+    info: info.value,
+    state: { fieldValues, overlays: [] },
+    signatures: new Map(),
+    options: { replaceNonWinAnsi: false, now: Date.now() },
+  });
+  if (!out.ok) throw new Error(`export failed: ${JSON.stringify(out.problems)}`);
+  return out.value.bytes;
+}
+
+/** A flattened export: how many form fields remain, and every decoded content stream as text. */
+export async function readFlattened(bytes: Uint8Array) {
+  const { PDFDocument, PDFRawStream, decodePDFRawStream } = corePdfLib;
+  const doc = await PDFDocument.load(bytes);
+  const fields = doc.getForm().getFields().length;
+  let streams = '';
+  for (const [, object] of doc.context.enumerateIndirectObjects()) {
+    if (object instanceof PDFRawStream) {
+      streams += Buffer.from(decodePDFRawStream(object).decode()).toString('latin1');
+    }
+  }
+  /** Whether `text` is drawn, as a literal or a hex string (pdf-lib writes WinAnsi hex). */
+  const draws = (text: string) =>
+    streams.includes(`(${text})`) ||
+    streams
+      .toUpperCase()
+      .includes(`<${Buffer.from(text, 'latin1').toString('hex').toUpperCase()}>`);
+  return { fields, draws };
+}
+
+/** The share of non-white pixels in a PDF-point box of a rendered page (0 for blank paper). */
+export async function inkInBox(
+  page: Page,
+  number: number,
+  box: [x0: number, y0: number, x1: number, y1: number],
+  pageHeightPt: number,
+): Promise<number> {
+  return page.locator(`[data-page="${number}"][data-status="ready"] canvas`).evaluate(
+    (canvas: HTMLCanvasElement, { box, pageHeightPt }) => {
+      const k = canvas.height / pageHeightPt;
+      const [x0, y0, x1, y1] = box;
+      const sx = Math.round(x0 * k);
+      const sy = Math.round((pageHeightPt - y1) * k);
+      const w = Math.max(1, Math.round((x1 - x0) * k));
+      const h = Math.max(1, Math.round((y1 - y0) * k));
+      const { data } = canvas.getContext('2d')!.getImageData(sx, sy, w, h);
+      let inked = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i]! < 200 || data[i + 1]! < 200 || data[i + 2]! < 200) inked++;
+      }
+      return inked / (data.length / 4);
+    },
+    { box, pageHeightPt },
+  );
+}

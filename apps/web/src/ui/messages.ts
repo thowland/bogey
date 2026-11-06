@@ -59,3 +59,15 @@ export function messageFor(problem: Problem): string {
 }
 
 export const messageCodes = (): ProblemCode[] => Object.keys(MESSAGES) as ProblemCode[];
+
+// ── fields (Sprint 5) ──
+
+/** Document notices shown on open (D4, spec §6.1, §6.2). Plain text; no document data. */
+export const NOTICES = Object.freeze({
+  xfaHybrid:
+    'This form also carries an Adobe XFA layer. Bogey fills its standard fields instead; the XFA layer is removed from the downloaded copy.',
+  xfaDynamic:
+    'This is an Adobe XFA form, and Bogey cannot fill its fields directly. Forms of this kind draw their pages only in Adobe Reader, so what you see here is probably the placeholder page other readers show in its place. You can still type over the page and download a copy.',
+  manyPages: (pages: number) =>
+    `This document has ${pages.toLocaleString('en-US')} pages. Bogey shows one page at a time, and on an iPad each page may take a few seconds to draw.`,
+});
