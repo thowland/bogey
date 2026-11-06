@@ -1,5 +1,5 @@
 // The open sequence (D1–D3, spec §6.1) with a fake pdf.js loader and core bridge.
-import { fail, ok, type PdfInfo, type Problem } from '@bogey/core';
+import { fail, ok, type Problem } from '@bogey/core';
 import { describe, expect, it, vi } from 'vitest';
 import { LIMITS } from '../src/config.ts';
 import { pdfBridge, stubPdfBridge, type PdfBridge } from '../src/core-bridge/pdf.ts';
@@ -55,19 +55,6 @@ describe('accepting a file (D1, D2)', () => {
     });
     expect(unreadable).toEqual(fail({ code: 'file.unreadable' }));
   });
-});
-
-const info = (overrides: Partial<PdfInfo> = {}): PdfInfo => ({
-  formType: 'flat',
-  xfa: 'none',
-  encrypted: false,
-  decryptable: true,
-  pageCount: 3,
-  pages: [],
-  fields: [],
-  initialValues: {},
-  metadata: {},
-  ...overrides,
 });
 
 const session = (file = pdfFile()): OpenSession => ({

@@ -1,6 +1,6 @@
 // The pdf.js loader (spec §6.1 step 5, §10.3): the one module that imports pdfjs-dist. It is
 // loaded on demand by pdfjs/index.ts, so pdf.js is not part of the start-up bundle.
-import { fail, ok, type Problem, type Result } from '@bogey/core';
+import type { Problem, Result } from '@bogey/core';
 import {
   AnnotationMode,
   getDocument,
@@ -187,11 +187,11 @@ export async function load(
     ...(password === undefined ? {} : { password }),
   });
   try {
-    return ok(wrapDocument(await task.promise, task));
+    return { ok: true, value: wrapDocument(await task.promise, task) };
   } catch (error) {
     const problem = loadProblem(error);
     if (problem.code === 'pdf.damaged') console.error('pdf.js could not load the document', error);
     await task.destroy().catch(() => undefined);
-    return fail(problem);
+    return { ok: false, problems: [problem] };
   }
 }

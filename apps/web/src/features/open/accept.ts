@@ -1,6 +1,6 @@
 // Accepting a file (D1, D2, spec §6.1 steps 1–2): refuse anything over the size limit before
 // reading it, then decide the type by content, the way PDF readers do.
-import { fail, ok, type Problem, type Result } from '@bogey/core';
+import type { Problem, Result } from '@bogey/core';
 import { LIMITS } from '../../config.ts';
 
 /** Readers look for the header within the first 1,024 bytes. */
@@ -15,6 +15,9 @@ export function hasPdfHeader(bytes: Uint8Array): boolean {
   return false;
 }
 
+// Result literals, since core's runtime helpers are reached only through core-bridge/ (spec §2.1).
+const fail = (problem: Problem): Result<never, Problem> => ({ ok: false, problems: [problem] });
+
 export type FileLike = Pick<Blob, 'size' | 'arrayBuffer'>;
 
 export async function readPdf(file: FileLike): Promise<Result<Uint8Array, Problem>> {
@@ -28,5 +31,5 @@ export async function readPdf(file: FileLike): Promise<Result<Uint8Array, Proble
     console.error('Reading the file failed', error);
     return fail({ code: 'file.unreadable' });
   }
-  return hasPdfHeader(bytes) ? ok(bytes) : fail({ code: 'file.not-pdf' });
+  return hasPdfHeader(bytes) ? { ok: true, value: bytes } : fail({ code: 'file.not-pdf' });
 }
