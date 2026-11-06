@@ -1,0 +1,107 @@
+/* The field layer (F2, spec §7.1): stretched over the page sheet. The layer itself lets pointer
+   events through, so only the controls take clicks; the overlay layer (S4) sits above it. */
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* One widget: positioned and sized in view-space CSS px, rotated about its center (spec §5.4).
+   Position, size and rotation are set through the CSSOM by the component. */
+.widget {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: auto;
+  transform-origin: center;
+}
+
+/* The page is always white with dark ink (the canvas), so the controls keep a light scheme
+   whatever the app's colour scheme. */
+.control {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 0.15em;
+  border: 0;
+  border-radius: 0;
+  background: rgb(37 99 235 / 0.08);
+  color: #000;
+  color-scheme: light;
+  font-family: 'Bogey Overlay', Helvetica, Arial, sans-serif;
+  line-height: 1.15;
+}
+
+.control:hover:not(.readonly) {
+  background: rgb(37 99 235 / 0.14);
+}
+
+.control:focus-visible,
+.control:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+  background: rgb(37 99 235 / 0.04);
+}
+
+.readonly,
+.readonly:focus {
+  background: transparent;
+  opacity: 1;
+  color: #000;
+}
+
+.multiline {
+  resize: none;
+  overflow: auto;
+  padding: 0.1em 0.15em;
+}
+
+/* Comb fields (F4): a monospaced face with one character per cell. --cell is the cell width in
+   CSS px; 1ch is a monospaced glyph's advance, so the spacing puts each glyph in its cell. */
+.comb {
+  padding: 0 0 0 calc((var(--cell) - 1ch) / 2);
+  font-family: var(--font-mono);
+  letter-spacing: calc(var(--cell) - 1ch);
+}
+
+.left {
+  text-align: left;
+}
+
+.center {
+  text-align: center;
+}
+
+.right {
+  text-align: right;
+}
+
+.check {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  accent-color: #1b1f1c;
+  color-scheme: light;
+}
+
+.check:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.select {
+  padding: 0 0.1em;
+}
+
+.list {
+  padding: 0;
+  overflow-y: auto;
+}
+
+/* Button and signature fields (F1): an outline with a label, not a control. */
+.outline {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed rgb(27 31 28 / 0.55);
+}
