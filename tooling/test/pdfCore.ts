@@ -5,11 +5,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   getDocument,
-  PageViewport,
   VerbosityLevel,
 } from '../../apps/web/node_modules/pdfjs-dist/legacy/build/pdf.mjs';
-
-export { PageViewport };
 
 export const root = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -50,7 +47,6 @@ export async function openWithPdfjs(bytes: Uint8Array, password?: string) {
   const task = getDocument({
     data: bytes.slice(),
     ...(password !== undefined ? { password } : {}),
-    isEvalSupported: false,
     verbosity: VerbosityLevel.ERRORS,
   });
   const pdf = await task.promise;
@@ -74,3 +70,21 @@ export async function textItems(bytes: Uint8Array, password?: string): Promise<T
 }
 
 export const pageText = (items: TextItem[]) => items.map((i) => i.str).join(' ');
+
+export interface ViewportLike {
+  convertToViewportPoint(x: number, y: number): number[];
+}
+export type ViewportClass = new (params: {
+  viewBox: number[];
+  userUnit: number;
+  scale: number;
+  rotation: number;
+}) => ViewportLike;
+
+/** pdf.js does not export PageViewport; take the class from a page's viewport. */
+export async function pageViewportClass(): Promise<ViewportClass> {
+  const pdf = await openWithPdfjs(fixture('fixtures/vendored/generated/rotate-0.pdf'));
+  const viewport = (await pdf.getPage(1)).getViewport({ scale: 1 });
+  await pdf.close();
+  return viewport.constructor as ViewportClass;
+}
