@@ -1,0 +1,18 @@
+/* Tool buttons, overlay properties and history in the app toolbar (O2, O8). */
+.group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.field select {
+  min-height: 2.25rem;
+  font: inherit;
+}
