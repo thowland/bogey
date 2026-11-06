@@ -115,3 +115,17 @@ export async function inkCoverage(page: Page, number: number): Promise<number> {
       return inked / sampled;
     });
 }
+
+// ── fields (Sprint 5) ──
+
+/** The field layer of the page on screen (F2). */
+export function fieldLayer(page: Page) {
+  return page.getByRole('group', { name: /^Form fields on page \d+$/ });
+}
+
+/** The Fields panel (F7), opened on its tab. */
+export async function fieldsPanel(page: Page) {
+  const panel = page.getByRole('complementary', { name: /fields, snippets and signatures/i });
+  await panel.getByRole('tab', { name: 'Fields' }).click();
+  return panel;
+}

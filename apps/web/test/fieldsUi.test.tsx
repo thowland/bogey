@@ -95,6 +95,21 @@ describe('the field layer (F1, F2, F8, U4)', () => {
     );
   });
 
+  it('drops a snippet target that belongs to another document', () => {
+    useViewStore.getState().setTargetField('elsewhere.name');
+    open();
+    renderLayer();
+    expect(useViewStore.getState().targetField).toBeNull();
+    act(() => useViewStore.getState().setTargetField('form.name'));
+    expect(useViewStore.getState().targetField).toBe('form.name');
+  });
+
+  it('draws nothing without page geometry', () => {
+    open({ ...fieldsInfo(), pages: undefined } as unknown as PdfInfo);
+    renderLayer();
+    expect(screen.queryByRole('group')).toBeNull();
+  });
+
   it('draws nothing until the page has a zoom, or when the page has no fields', () => {
     open(fieldsInfo(), 0, null);
     const { unmount } = renderLayer();

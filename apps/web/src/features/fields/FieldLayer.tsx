@@ -24,9 +24,18 @@ export function FieldLayer() {
   const layer = useRef<HTMLDivElement>(null);
 
   const fields = info?.fields ?? NO_FIELDS;
-  const geometry = info?.pages[page];
+  // Optional chaining on `pages` too: a document without page geometry draws no fields.
+  const geometry = info?.pages?.[page];
   const placed = useMemo(() => widgetsOnPage(fields, page), [fields, page]);
   const ready = geometry !== undefined && zoom !== null && placed.length > 0;
+
+  // A snippet target left over from another document is dropped (N2).
+  useEffect(() => {
+    const target = useViewStore.getState().targetField;
+    if (target !== null && !fields.some((f) => f.name === target)) {
+      useViewStore.getState().setTargetField(null);
+    }
+  }, [fields]);
 
   // A focus request from the Fields panel or from tabbing off the previous page.
   useLayoutEffect(() => {
