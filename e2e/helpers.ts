@@ -131,7 +131,6 @@ export async function fieldsPanel(page: Page) {
 }
 
 import { createRequire } from 'node:module';
-import type { FieldValue } from '../packages/core/src/index.ts';
 
 /** The part of pdf-lib the export check uses, loaded from core's own dependency. */
 interface PdfLibSubset {
@@ -148,29 +147,6 @@ interface PdfLibSubset {
 const corePdfLib = createRequire(new URL('../packages/core/package.json', import.meta.url))(
   '@cantoo/pdf-lib',
 ) as PdfLibSubset;
-
-/**
- * Interim export check until the export dialog (Sprint 4) is on master: exports a fixture with the
- * given field values through core, as the pdf worker does, and returns the bytes.
- */
-export async function exportInNode(
-  path: string,
-  fieldValues: Record<string, FieldValue>,
-): Promise<Uint8Array> {
-  const core = await import('../packages/core/src/index.ts');
-  const bytes = new Uint8Array(fixture(path));
-  const info = await core.inspectPdf(bytes);
-  if (!info.ok) throw new Error(`inspect failed: ${JSON.stringify(info.problems)}`);
-  const out = await core.exportPdf({
-    bytes,
-    info: info.value,
-    state: { fieldValues, overlays: [] },
-    signatures: new Map(),
-    options: { replaceNonWinAnsi: false, now: Date.now() },
-  });
-  if (!out.ok) throw new Error(`export failed: ${JSON.stringify(out.problems)}`);
-  return out.value.bytes;
-}
 
 /** A flattened export: how many form fields remain, and every decoded content stream as text. */
 export async function readFlattened(bytes: Uint8Array) {
@@ -216,4 +192,127 @@ export async function inkInBox(
     },
     { box, pageHeightPt },
   );
+}
+
+// ── overlays and export (Sprint 4) ──
+import type { Download } from '@playwright/test';
+import { PDFDocument } from '../tooling/node_modules/@cantoo/pdf-lib/es/index.js';
+import { OPS } from '../apps/web/node_modules/pdfjs-dist/legacy/build/pdf.mjs';
+import { openWithPdfjs, textItems, type TextItem } from '../tooling/test/pdfCore.ts';
+
+/** The overlay layer of the page shown, which covers the page sheet. */
+export async function pageArea(page: Page) {
+  const layer = page.getByTestId('overlay-layer');
+  await expect(layer).toBeVisible();
+  const box = (await layer.boundingBox())!;
+  return { layer, box };
+}
+
+/**
+ * Converts a point on a displayed letter-size page (CSS px from its top-left) to PDF points, for a
+ * page whose view box is [0, 0, 612, 792] (spec §5.2).
+ */
+export function letterPoint(
+  box: { width: number },
+  rotate: 0 | 90 | 180 | 270,
+  px: { x: number; y: number },
+) {
+  const k = box.width / (rotate % 180 === 0 ? 612 : 792);
+  const u = px.x / k;
+  const v = px.y / k;
+  switch (rotate) {
+    case 0:
+      return { x: u, y: 792 - v };
+    case 90:
+      return { x: v, y: u };
+    case 180:
+      return { x: 612 - u, y: v };
+    case 270:
+      return { x: 612 - v, y: 792 - u };
+  }
+}
+
+/** Draws a signature with the mouse in the draw dialog and saves it under `name`. */
+export async function drawSignature(page: Page, name: string): Promise<void> {
+  const panel = page.getByRole('complementary', { name: /fields, snippets and signatures/i });
+  await panel.getByRole('tab', { name: 'Signatures' }).click();
+  await panel.getByRole('button', { name: 'Draw' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Draw a signature' });
+  const pad = dialog.getByRole('img', { name: 'Signature drawing area' });
+  const box = (await pad.boundingBox())!;
+  await page.mouse.move(box.x + 60, box.y + box.height * 0.7);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(box.x + 60 + i * 30, box.y + box.height * (0.5 + 0.25 * Math.sin(i)), {
+      steps: 2,
+    });
+  }
+  await page.mouse.up();
+  await dialog.getByRole('textbox', { name: 'Name' }).fill(name);
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+}
+
+/** Starts a download with `start` and returns its suggested name and bytes. */
+export async function download(
+  page: Page,
+  start: () => Promise<void>,
+): Promise<{ name: string; bytes: Uint8Array }> {
+  const pending: Promise<Download> = page.waitForEvent('download');
+  await start();
+  const file = await pending;
+  const stream = await file.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return { name: file.suggestedFilename(), bytes: new Uint8Array(Buffer.concat(chunks)) };
+}
+
+export interface ExportCheck {
+  pageCount: number;
+  fieldCount: number;
+  encrypted: boolean;
+  producer: string | undefined;
+  /** Text items per page, in PDF user space. */
+  text: TextItem[][];
+  /** Drawn images per page, as their placement matrix [a, b, c, d, e, f]. */
+  images: number[][][];
+}
+
+type Matrix = [number, number, number, number, number, number];
+const multiply = (m: Matrix, n: Matrix): Matrix => [
+  n[0] * m[0] + n[1] * m[2],
+  n[0] * m[1] + n[1] * m[3],
+  n[2] * m[0] + n[3] * m[2],
+  n[2] * m[1] + n[3] * m[3],
+  n[4] * m[0] + n[5] * m[2] + m[4],
+  n[4] * m[1] + n[5] * m[3] + m[5],
+];
+
+/** Reads an export back with pdf-lib and pdf.js, the way spec §14.4 verifies exports. */
+export async function readExport(bytes: Uint8Array): Promise<ExportCheck> {
+  const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+  const images: number[][][] = [];
+  const pdf = await openWithPdfjs(bytes);
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const ops = await (await pdf.getPage(i)).getOperatorList();
+    const found: number[][] = [];
+    let ctm: Matrix = [1, 0, 0, 1, 0, 0];
+    const stack: Matrix[] = [];
+    ops.fnArray.forEach((fn, j) => {
+      if (fn === OPS.save) stack.push(ctm);
+      else if (fn === OPS.restore) ctm = stack.pop() ?? ctm;
+      else if (fn === OPS.transform) ctm = multiply(ctm, ops.argsArray[j] as Matrix);
+      else if (fn === OPS.paintImageXObject) found.push([...ctm]);
+    });
+    images.push(found);
+  }
+  await pdf.close();
+  return {
+    pageCount: doc.getPageCount(),
+    fieldCount: doc.getForm().getFields().length,
+    encrypted: doc.isEncrypted || doc.context.trailerInfo.Encrypt !== undefined,
+    producer: doc.getProducer(),
+    text: await textItems(bytes),
+    images,
+  };
 }

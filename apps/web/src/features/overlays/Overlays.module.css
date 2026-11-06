@@ -1,0 +1,172 @@
+/* Overlays on the page (spec §7.2). The layer covers the page sheet. In select mode it lets clicks
+   through to the field layer underneath, and only the overlays take pointer events; in a
+   placement tool it takes every click on the page. */
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.placing {
+  pointer-events: auto;
+  cursor: crosshair;
+  /* A pan on iPad scrolls the page; only a tap places (spec §7.2). */
+  touch-action: pan-x pan-y;
+}
+
+.item {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.placing .item {
+  pointer-events: none;
+}
+
+/* The overlay itself: a button whose content is drawn exactly where export draws it. */
+.body {
+  position: absolute;
+  inset: 0;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #000;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.body:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Text in Liberation Sans, metrically compatible with the exported Helvetica (spec §7.2). The
+   line box is the line height, so CSS places the baseline from the font's hhea metrics. */
+.text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  font-family: var(--font-overlay);
+  font-weight: 400;
+  white-space: pre;
+  text-align: left;
+  color: #000;
+}
+
+.bold {
+  font-weight: 700;
+}
+
+.editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+  background: transparent;
+  color: #000;
+  font-family: var(--font-overlay);
+  font-weight: 400;
+  white-space: pre;
+  overflow: hidden;
+  resize: none;
+  pointer-events: auto;
+}
+
+.mark {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.signature {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.missing {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--failure);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--failure-text);
+  background: rgb(255 255 255 / 0.8);
+}
+
+/* The selection frame, with the resize handle at the bottom-right and a delete button (O7). */
+.frame {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* The hit area is larger than the visible dot: 12 px with a mouse, 44 px on touch (spec §7.2). */
+.handle {
+  --hit: 12px;
+  position: absolute;
+  right: calc(var(--hit) / -2 - 3px);
+  bottom: calc(var(--hit) / -2 - 3px);
+  width: var(--hit);
+  height: var(--hit);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.remove {
+  --hit: 20px;
+  position: absolute;
+  top: calc(var(--hit) * -1 - 4px);
+  right: -3px;
+  display: grid;
+  place-items: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--accent-text);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  .handle,
+  .remove {
+    --hit: 44px;
+  }
+}
