@@ -60,6 +60,8 @@ function UploadForm({ onClose, onSaved }: Omit<UploadDialogProps, 'open'>) {
 
   const choose = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    // Clear the input so that choosing the same file again (after an error) still reads it.
+    event.target.value = '';
     if (!file) return;
     setError(null);
     setStage({ step: 'reading' });

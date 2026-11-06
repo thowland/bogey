@@ -76,7 +76,8 @@ export class SignaturePadModel {
     const builder = new StrokeBuilder();
     this.active = { pointerId: sample.pointerId, pointerType: sample.pointerType, builder };
     const segments = builder.add(pointOf(sample));
-    return redraw ? { redraw: [...this.allSegments(), ...segments] } : { draw: segments };
+    // allSegments() already includes the new stroke's first point.
+    return redraw ? { redraw: this.allSegments() } : { draw: segments };
   }
 
   /**
