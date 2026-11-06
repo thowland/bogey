@@ -12,7 +12,12 @@ const BROWSER_API = { port: ports().vitest, strictPort: false };
 // them partway through a run on a cold cache, re-optimizes and reloads the page, which loads React
 // twice and fails test imports; the gate on master after a merge always starts cold for new
 // imports. Add a package here when a browser test (or code it loads) starts importing it.
-const CORE_BROWSER_DEPS = ['@cantoo/pdf-lib', 'zod', 'fast-check'];
+const CORE_BROWSER_DEPS = [
+  '@cantoo/pdf-lib',
+  '@cantoo/pdf-lib/standard-fonts',
+  'zod',
+  'fast-check',
+];
 const WEB_BROWSER_DEPS = [
   'react',
   'react/jsx-dev-runtime',
@@ -30,6 +35,7 @@ const WEB_BROWSER_DEPS = [
   '@testing-library/user-event',
   'fast-check',
   '@bogey/core > @cantoo/pdf-lib',
+  '@bogey/core > @cantoo/pdf-lib/standard-fonts',
   '@bogey/core > zod',
 ];
 
@@ -107,6 +113,8 @@ export default defineConfig({
         // Documented exclusions (implementation plan §1.3): entry-point glue that only runs
         // when the real app boots in a browser. Keep this list short and justify every entry.
         'apps/web/src/main.tsx', // React root mount; exercised by the production build and E2E.
+        // The pdf worker's bootstrap line (expose); its API is tested in workers/pdfWorkerApi.ts.
+        'apps/web/src/workers/pdf.worker.ts',
       ],
       reporter: ['text', 'html', 'json-summary'],
       thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },
