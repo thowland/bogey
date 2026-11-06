@@ -459,3 +459,23 @@ describe('stripActiveContent bounds', () => {
     );
   });
 });
+
+describe('pruneUnreachable', () => {
+  it('drops objects nothing references and keeps the page tree', async () => {
+    const { PDFDocument, PDFName } = await import('@cantoo/pdf-lib');
+    const { pruneUnreachable } = await import('../src/export/hygiene.ts');
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+    const orphan = doc.context.register(
+      doc.context.obj({ S: PDFName.of('JavaScript'), JS: 'app.alert(1)' }),
+    );
+    const linked = doc.context.register(doc.context.obj({ Kept: true }));
+    doc.catalog.set(PDFName.of('Kept'), linked);
+    await doc.flush();
+    expect(pruneUnreachable(doc)).toBeGreaterThanOrEqual(1);
+    expect(doc.context.lookup(orphan)).toBeUndefined();
+    expect(doc.context.lookup(linked)).toBeDefined();
+    const reloaded = await PDFDocument.load(await doc.save());
+    expect(reloaded.getPageCount()).toBe(1);
+  });
+});
