@@ -277,6 +277,8 @@ All arithmetic is in doubles; nothing is rounded except by `snapToGrid`, which r
 | `/AcroForm /XFA` present **and** AcroForm widgets with appearance streams exist | `hybrid` | `acroform` | Notice: "This form also carries an Adobe XFA layer. Bogey fills its standard fields instead; the XFA layer is removed from the downloaded copy." Export calls `form.deleteXFA()` |
 | `/XFA` present and no usable widgets, or `/NeedsRendering true` | `dynamic` | `xfa` | The D4 notice, and the page is treated as flat |
 
+Inspection loads with `preserveXFA: true`: the pdf-lib fork otherwise deletes the XFA entry the first time `getForm()` runs, saving included, so without it no document would ever look like XFA (found in Sprint 0). Export loads without it for hybrid forms, which is the removal described above.
+
 The hybrid case departs from D4's "treat as flat" (§16). Hybrid forms, which include many government forms produced from LiveCycle as static XFA, carry a complete AcroForm copy of every field, and filling it gives a better result than typing over it; removing the XFA stream on export stops Acrobat from preferring the stale XFA data over the filled values. A dynamic XFA form usually renders in non-Adobe readers as a single placeholder page ("Please wait… this document requires Adobe Reader"); in that case the notice adds that what is visible is the placeholder, so the user is not left wondering where the form went.
 
 ### 6.3 Field enumeration (F1)
@@ -374,7 +376,7 @@ Accepted inputs are whatever `createImageBitmap` decodes: PNG, JPEG, WebP everyw
 
 ### 8.3 Library (G1, G5)
 
-Signatures are stored as `{ id, name, kind, png: Blob, width, height, createdAt }` (G1). The Signatures panel lists thumbnails grouped by kind; clicking one enters place-signature mode (G5), and each item has rename and delete actions. Deleting a signature that is placed in a document asks first; the placed overlays keep working until the next export, which fails with a message naming the affected pages if the image is gone. To avoid that, export reads signature images from the library at export time and the overlay picker marks overlays whose signature has been deleted.
+Signatures are stored as `{ id, name, kind, png: ArrayBuffer, width, height, createdAt }` (G1). The Signatures panel lists thumbnails grouped by kind; clicking one enters place-signature mode (G5), and each item has rename and delete actions. Deleting a signature that is placed in a document asks first; the placed overlays keep working until the next export, which fails with a message naming the affected pages if the image is gone. To avoid that, export reads signature images from the library at export time and the overlay picker marks overlays whose signature has been deleted.
 
 ---
 
@@ -510,11 +512,13 @@ IndexedDB database `bogey`, version 1:
 
 | Store | Key | Value |
 | --- | --- | --- |
-| `documents` | `id` | `{ id, name, pageCount, formType, xfa, encrypted, thumbnail: Blob, createdAt, updatedAt, lastPage, zoom, fieldValues, overlays, schemaVersion }` |
-| `documentBytes` | `id` | `{ id, bytes: Blob, size, sha256 }` |
-| `signatures` | `id` | `{ id, name, kind, png: Blob, width, height, createdAt }` |
+| `documents` | `id` | `{ id, name, pageCount, formType, xfa, encrypted, thumbnail: ArrayBuffer, createdAt, updatedAt, lastPage, zoom, fieldValues, overlays, schemaVersion }` |
+| `documentBytes` | `id` | `{ id, bytes: ArrayBuffer, size, sha256 }` |
+| `signatures` | `id` | `{ id, name, kind, png: ArrayBuffer, width, height, createdAt }` |
 | `snippets` | `id` | `{ id, label, value, order }` |
 | `settings` | `key` | `{ key, value }`: `dateFormat`, `activeDocumentId`, `defaultFontSize`, `firstRunNoticeDismissed`, `persistRequested` |
+
+Binary data (PDF bytes, thumbnails, signature PNGs) is stored as `ArrayBuffer`, not `Blob`. Sprint 0 found that WebKit intermittently aborts IndexedDB transactions that hold Blobs ("Error preparing Blob/File data to be stored in object store", the same failure Safari has long shown in private browsing), while ArrayBuffers stored reliably in all three engines. The app converts to `Blob` only for display and download.
 
 The original bytes moved out of `documents` into `documentBytes` (§16): the bytes are written once on open and never again, while the document record is rewritten on every autosave, and a single record of up to 50 MB would make every autosave copy the file.
 
@@ -544,7 +548,7 @@ Date formats (O5): `MM/DD/YYYY` (default), `YYYY-MM-DD`, `DD MMM YYYY`, `Month D
 
 ### 10.7 Browser support (P1–P4)
 
-Targets: current stable Chrome, Edge, Firefox and Safari on macOS, Windows and Linux, and Safari on the current iPadOS major. Required features (all present in those targets): module workers, Pointer Events, `createImageBitmap` with resize options, IndexedDB with Blob values, `Intl.DateTimeFormat`, Trusted Types where supported (Chromium and Safari; Firefox relies on the CSP alone). Feature checks at startup show a single message on an unsupported browser rather than partial behavior. Download always uses an anchor with `download` (P4); the File System Access API is not used.
+Targets: current stable Chrome, Edge, Firefox and Safari on macOS, Windows and Linux, and Safari on the current iPadOS major. Required features (all present in those targets): module workers, Pointer Events, `createImageBitmap` with resize options, IndexedDB with ArrayBuffer values, `Intl.DateTimeFormat`, Trusted Types where supported (Chromium and Safari; Firefox relies on the CSP alone). Feature checks at startup show a single message on an unsupported browser rather than partial behavior. Download always uses an anchor with `download` (P4); the File System Access API is not used.
 
 ---
 
@@ -780,6 +784,7 @@ Phase 2 items from the vision (page operations, typed signatures, sync, unflatte
 | D4 | Hybrid XFA forms are filled through their AcroForm fields, with XFA removed on export | Gives a filled form instead of typed-over text (§6.2) |
 | E2 | Only user-changed fields are set; an appearance check precedes flattening | Preserves the original look of untouched fields, and prevents `flatten()` from dropping fields without appearances (§9.1) |
 | V4 | `touch-action: pan-x pan-y` without `pinch-zoom`, and Safari gesture events cancelled | `pinch-zoom` would hand pinch to the browser, which is what V4 is trying to prevent (§10.4) |
+| §9 data model | Binary values stored as `ArrayBuffer`, not `Blob` | WebKit aborts IndexedDB transactions holding Blobs intermittently (found in Sprint 0, §10.5) |
 | G4 | 16-level alpha ramp below the threshold | Removes jagged fringes around anti-aliased ink (§8.2) |
 
 ### 16.2 Additions not in the requirements

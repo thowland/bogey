@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM and no Node types: core must run unchanged in browsers and in Node.
+    // Cross-environment globals that core may use are declared in src/globals.d.ts.
+    "lib": ["ES2022"],
+    "types": [],
+    // Core sources also run directly under Node's type stripping (scripts/), which supports
+    // only erasable TypeScript syntax.
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src"]
+}

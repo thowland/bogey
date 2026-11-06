@@ -12,11 +12,11 @@ Bogey is a browser-only PDF fill-and-sign tool: open a PDF, fill its form fields
 
 ## Status
 
-Pre-Sprint 0: only the docs exist. Sprint 0 creates the workspace, tooling and scripts listed below; until then, the commands in this file do not exist yet. Update this section and the commands as sprints land.
+Sprint 0 (foundations): workspace, tooling, contracts, persistence base, fixtures and hosting are in place; feature directories hold placeholders that later sprints replace. Update this section as sprints land.
 
-## Commands (from Sprint 0)
+## Commands
 
-pnpm workspace, Node 22+. First run needs `pnpm exec playwright install chromium firefox webkit`; fixture generation needs `qpdf` (`brew install qpdf`).
+pnpm workspace, Node 22+. First run needs `pnpm exec playwright install chromium firefox webkit`; regenerating fixtures needs `qpdf` (`brew install qpdf`).
 
 ```bash
 pnpm dev                       # Vite dev server (relaxed dev CSP for HMR)
@@ -29,12 +29,21 @@ pnpm demo:export               # (Sprint 2) filled/overlaid exports of each fixt
 pnpm infra:deploy              # create/update the CloudFormation stack (infra/bogey.yaml)
 pnpm deploy:site               # gate, build, publish master to bogey.beta-site.us, check live headers
 
-scripts/fetch-fixtures.sh      # download fetched fixtures, verify SHA-256
+pnpm fixtures:make             # regenerate fixtures/vendored/generated and their manifest entries
+pnpm fixtures:fetch            # download fetched fixtures (gitignored), verify SHA-256
 scripts/worktree.sh start|finish sprint/NN-name
-scripts/close-sprint.sh sprint/NN-name
+scripts/close-sprint.sh sprint/NN-name <message-file>   # merge lock, gate, --no-ff merge, tag, deploy
 ```
 
-Vitest projects: `core:node`, `core:chromium|firefox|webkit`, `web:jsdom`, `web:chromium`, `tooling:node`.
+Vitest projects: `core:node`, `core:chromium|firefox|webkit`, `web:jsdom`, `web:chromium|firefox|webkit` (files named `*.browser.test.ts`), `tooling:node`. Only Chromium feeds coverage.
+
+```bash
+pnpm exec vitest run --project web:jsdom apps/web/test/app.test.tsx   # one file
+pnpm exec vitest run --project core:node -t "unique"                  # one test by name
+pnpm exec playwright test smoke --project webkit                      # one E2E spec (needs pnpm build)
+```
+
+E2E runs against the production build via `vite preview`. Ports come from `scripts/ports.mjs`, derived from the checkout path, so worktrees can run the gate at the same time (main checkout: preview 4173, E2E 4174). Chromium runs every spec; Firefox and WebKit run specs whose title contains `@all-engines`. Every E2E test fails on any CSP or Trusted Types violation or page error (fixture in `e2e/helpers.ts`); the expected-fail self-test in `e2e/security.spec.ts` shows as ✘ but counts as passing.
 
 ## Workflow rules
 
@@ -54,10 +63,12 @@ Vitest projects: `core:node`, `core:chromium|firefox|webkit`, `web:jsdom`, `web:
 - **`packages/core` (`@bogey/core`)**: every decision about a document, with no DOM, Node or pdf.js dependency (`lib: ES2022`, `types: []`). Geometry (spec §5), inspection and field enumeration (§6), edits and undo (§7), signature pixel ops on RGBA buffers (§8), export (§9), snippet import (§10.6). Runtime dependencies: `@cantoo/pdf-lib` and `zod` (run `jitless: true`). Returns `Result` with typed problems; throws only on programmer error.
 - **`apps/web` (`@bogey/web`)**: React 19 + Vite + zustand.
   - `pdfjs-dist` may be imported only in `src/pdfjs/`; pdf.js is used for display only.
-  - Core runtime code is reached only through `src/core-bridge/` and `src/workers/pdf.worker.ts` (comlink). Type imports from `@bogey/core` are fine anywhere.
+  - Core runtime code is reached only through `src/core-bridge/` and `src/workers/pdf.worker.ts` (comlink). Type imports from `@bogey/core` are fine anywhere; constants go through `core-bridge/model.ts`.
+  - `core-bridge/pdf.ts` holds the `PdfBridge` contract; until Sprint 2 it is a stub that treats every document as flat.
   - One zustand store per file in `src/state/`, each owned by one sprint.
-  - `state/persistence.ts` owns IndexedDB (`bogey` database); original PDF bytes live in their own `documentBytes` store.
+  - `state/persistence.ts` owns IndexedDB (`bogey` database) behind a `Repository` with an ordered queue, in-memory fallback and fail-closed clear; original PDF bytes live in their own `documentBytes` store. Binary values are stored as `ArrayBuffer`, never `Blob` (WebKit aborts Blob writes intermittently).
   - App limits live in `src/config.ts`; problem codes and their user text in `src/ui/messages.ts`.
+- The pdf-lib fork deletes a document's XFA whenever `getForm()` runs (saving included) unless loaded with `preserveXFA: true`.
 - Coordinates: overlays store an anchor in unrotated PDF points and dimensions in the upright (as-viewed) frame; export draws with `rotate = page /Rotate` (spec §5.3).
 
 ## Security constraints

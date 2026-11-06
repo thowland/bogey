@@ -1,0 +1,17 @@
+/* Overlay text font (spec §1, §7.2): Liberation Sans, metrically compatible with Helvetica, so
+   on-screen placement matches the exported Helvetica text. WinAnsi subset; SIL OFL 1.1. */
+@font-face {
+  font-family: 'Bogey Overlay';
+  src: url('../assets/fonts/LiberationSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Bogey Overlay';
+  src: url('../assets/fonts/LiberationSans-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}

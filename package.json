@@ -1,0 +1,48 @@
+{
+  "name": "bogey",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @bogey/web dev",
+    "preview": "pnpm --filter @bogey/web preview",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint . --max-warnings 0 && prettier --check . && depcruise packages apps --config .dependency-cruiser.cjs && pnpm typecheck && pnpm audit --audit-level high",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage --project core:node --project core:chromium --project web:jsdom --project web:chromium --project tooling:node",
+    "test:browsers": "vitest run --project core:firefox --project core:webkit --project web:firefox --project web:webkit",
+    "test:e2e": "playwright test",
+    "gate": "pnpm lint && pnpm test:coverage && pnpm test:browsers && pnpm build && pnpm test:e2e",
+    "fixtures:make": "node tooling/scripts/make-fixtures.ts",
+    "fixtures:fetch": "scripts/fetch-fixtures.sh",
+    "infra:deploy": "scripts/infra-deploy.sh",
+    "deploy:site": "scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.19.2",
+    "@vitest/browser-playwright": "^5.1.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/eslint-plugin": "^1.6.28",
+    "dependency-cruiser": "^18.7.2",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "fast-check": "^4.10.2",
+    "globals": "^17.14.0",
+    "playwright": "^1.64.1",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,13 @@
+.page {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--gutter) var(--space-6);
+}
+
+.page h1 {
+  font-size: var(--text-2xl);
+}
+
+.page h2 {
+  font-size: var(--text-lg);
+}

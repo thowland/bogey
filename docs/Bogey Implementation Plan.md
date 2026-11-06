@@ -62,11 +62,11 @@ Sprint 0 removes the usual sources of conflict before any concurrent work starts
 - **One store per file and one feature per directory.** `state/document.ts`, `view.ts`, `edits.ts`, `signatures.ts`, `snippets.ts` and `settings.ts` each belong to one sprint.
 - **Layout slots.** `App.tsx`, the toolbar and the right panel compose components exported from each feature's `index.ts`. Sprint 0 creates every feature's `index.ts` with placeholder exports, so a sprint fills in its own feature without editing the layout.
 - **Append-only shared files.** `ui/messages.ts` (problem codes and their text) and `e2e/helpers.ts` may only gain lines at the end of the section for the sprint's feature, which git merges cleanly or with trivial conflicts.
-- **Ports per worktree.** `vite preview` and the Playwright server read their ports from `scripts/ports.sh`, which derives them from the worktree path, so three sessions can run the gate at the same time.
+- **Ports per worktree.** `vite preview` and the Playwright server read their ports from `scripts/ports.mjs`, which derives them from the worktree path, so three sessions can run the gate at the same time.
 
 ### 1.5 Sprint close procedure
 
-`scripts/close-sprint.sh sprint/NN-name` runs the steps below. Merges into `master` are serialized with a lock directory in the shared git directory (`$(git rev-parse --git-common-dir)/bogey-merge.lock`), so two sessions finishing together queue rather than collide.
+`scripts/close-sprint.sh sprint/NN-name <message-file>` runs the steps below; the message file holds the merge subject and summary, and the script appends the coverage line. It takes the merge lock before step 1, so the branch's gate always runs against the master it will merge into. Merges into `master` are serialized with a lock directory in the shared git directory (`$(git rev-parse --git-common-dir)/bogey-merge.lock`), so two sessions finishing together queue rather than collide.
 
 ```bash
 # 1. In the sprint worktree: bring in whatever else has merged this wave
@@ -148,7 +148,7 @@ The MVP is reached when S4 and S5 have both merged. It covers the spec's core pa
   - Vitest projects (`core:node`, `core:chromium|firefox|webkit`, `web:jsdom`, `web:chromium`, `tooling:node`), merged v8 coverage with thresholds at 80.
   - Playwright config serving the production build with the production headers; the CSP/Trusted Types violation fixture in `e2e/helpers.ts` (from Mulligan); one smoke spec.
   - Scripts: `dev`, `build`, `preview`, `lint`, `test`, `test:coverage`, `test:browsers`, `test:e2e`, `gate`.
-  - `scripts/worktree.sh`, `scripts/ports.sh` and `scripts/close-sprint.sh` (§1.1, §1.4, §1.5).
+  - `scripts/worktree.sh`, `scripts/ports.mjs` and `scripts/close-sprint.sh` (§1.1, §1.4, §1.5).
   - `.github/workflows/ci.yml` running the gate (dormant until a remote exists).
   - `tooling/test/boundaries.test.ts` proving each boundary rule rejects a planted violation.
 - **Security baseline** (spec §11.3): `apps/web/security/headers.json`; the `vite preview` middleware serving them on every response including 304s; `security/trustedTypes.ts` with the default policy for the two worker URLs and `/sw.js`; the dev-only relaxed CSP.
@@ -160,7 +160,7 @@ The MVP is reached when S4 and S5 have both merged. It covers the spec's core pa
   - `config.ts` with every limit from spec §11.8; `ui/messages.ts` with every problem code from spec §10.4; the `ui/` primitives (Button, Dialog, Tabs, Toast, Banner, ErrorBoundary); design tokens copied from Mulligan; light and dark themes; Liberation Sans subset fonts.
   - Empty state (U5): drop-zone placeholder, empty recent list, the privacy paragraph.
 - **Persistence base** (spec §10.5): `state/persistence.ts` with the version 1 schema (all five stores), typed accessors per store, the ordered write queue, the 3 s open timeout and in-memory fallback, and the fail-closed `deleteDatabase` routine. It is used by S3 and S6.
-- **Fixtures** (requirements Appendix A, spec §14.2): `make-fixtures.ts` (rotations with registration marks, non-zero crop origin, every-field-type AcroForm, a hybrid XFA case if one can be generated, large document, encrypted copy through qpdf), `fetch-fixtures.sh` with SHA-256 verification, `manifest.json`, `LICENSES.md`, the vendored pdfium, pdf-lib and py-pdf selections, and `tooling/test/fixtures.test.ts` checking the A.5 coverage matrix.
+- **Fixtures** (requirements Appendix A, spec §14.2): `tooling/scripts/make-fixtures.ts` (rotations with registration marks, non-zero crop origin, every-field-type AcroForm, a hybrid XFA case if one can be generated, large document, encrypted copy through qpdf), `fetch-fixtures.sh` with SHA-256 verification, `manifest.json`, `LICENSES.md`, the vendored pdfium, pdf-lib and py-pdf selections, and `tooling/test/fixtures.test.ts` checking the A.5 coverage matrix.
 - **Infrastructure and deploy** (spec §11.7): `infra/bogey.yaml` adapted from Mulligan's (with `GET`/`HEAD` only, logging off, unhashed `/pdfjs/*` and `sw.js` as `no-cache`), `tooling/test/infra.test.ts` holding the headers policy equal to `headers.json`, `infra-deploy.sh`, `deploy.sh` (refuses any branch but `master`), `check-live-headers.mjs`. Stack created and the shell deployed.
 - **Repository docs:** `CLAUDE.md` (commands, workflow rules from this plan, architecture summary, security constraints), `LICENSE` (GPL-3.0-or-later), a short `README.md`.
 
@@ -219,7 +219,8 @@ The MVP is reached when S4 and S5 have both merged. It covers the spec's core pa
 
 **Goal:** everything Bogey decides about a document, implemented and tested in `@bogey/core`, and running in the pdf worker: geometry, inspection, edits and undo, export.
 
-**Owns:** `packages/core/src/geometry/`, `inspect/`, `history/`, `text/`, `export/`, `naming.ts` and their tests; `apps/web/src/workers/pdf.worker.ts`; `core-bridge/pdf.ts` (replacing the S0 stub); `state/edits.ts`; `tooling/scripts/demo-export.ts`.
+**Owns:** `packages/core/src/geometry/`, `inspect/`, `history/`, `text/`, `export/`, `naming.ts` and their tests; `apps/web/src/workers/pdf.worker.ts`; `core-bridge/pdf.ts` (replacing the S0 stub) and any new `core-bridge/` module for history; `state/edits.ts`; `tooling/scripts/demo-export.ts`.
+**Note:** inspection must load with `preserveXFA: true` (spec §6.2).
 **Touches:** `packages/core/src/index.ts` (exports for owned modules); `fixtures/manifest.json` (append entries only).
 
 **Scope**
@@ -340,7 +341,7 @@ The MVP is reached when S4 and S5 have both merged. It covers the spec's core pa
 
 **Goal:** nothing is lost on reload, the recent list works, encrypted documents round-trip, and storage failures are handled.
 
-**Owns:** `apps/web/src/state/session.ts`, `features/open/RecentDocuments`, `features/settings/ClearEverything`, the memory-mode banner, thumbnail generation for records.
+**Owns:** `apps/web/src/state/session.ts`, `state/storage.ts`, `features/storage/` (the memory-mode banner), `features/open/RecentDocuments`, `features/settings/ClearEverything`, thumbnail generation for records.
 **Touches:** `features/open/openDocument.ts` (inserting the persist step into S1's pipeline, nothing else); `ui/messages.ts`, `e2e/helpers.ts` (append).
 
 **Scope**
