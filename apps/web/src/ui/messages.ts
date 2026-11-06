@@ -71,3 +71,11 @@ export const NOTICES = Object.freeze({
   manyPages: (pages: number) =>
     `This document has ${pages.toLocaleString('en-US')} pages. Bogey shows one page at a time, and on an iPad each page may take a few seconds to draw.`,
 });
+
+// ── offline (Sprint 9) ──
+
+/** The update prompt (spec §11.5, B7): a new build's service worker is waiting. */
+export const UPDATE_PROMPT = Object.freeze({
+  text: 'A new version is ready. Reload to update.',
+  action: 'Reload',
+});
