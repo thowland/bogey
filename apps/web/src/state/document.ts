@@ -2,6 +2,7 @@
 // it in state/session.ts. Bytes and the password live here, in memory only (spec §10.5, D3).
 import type { PdfInfo, Problem } from '@bogey/core';
 import { create } from 'zustand';
+import type { PdfDisplayDocument } from '../pdfjs/types.ts';
 
 export type DocumentStatus = 'empty' | 'opening' | 'password' | 'ready' | 'error';
 
@@ -12,6 +13,8 @@ export interface DocumentState {
   /** The original bytes (E1). Never mutated; pdf.js always receives a copy. */
   bytes: Uint8Array | null;
   info: PdfInfo | null;
+  /** The document as loaded into pdf.js for display (spec §10.3). */
+  display: PdfDisplayDocument | null;
   /** Held for the session only, never persisted (D3). */
   password: string | null;
   problem: Problem | null;
@@ -28,6 +31,7 @@ const initial: DocumentState = {
   name: null,
   bytes: null,
   info: null,
+  display: null,
   password: null,
   problem: null,
 };

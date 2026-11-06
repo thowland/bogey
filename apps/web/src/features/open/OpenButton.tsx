@@ -1,6 +1,6 @@
-import { Button } from '../../ui/Button.tsx';
+import { FilePicker } from './FilePicker.tsx';
 
-/** Sprint 1 connects this to the file picker (D1). */
+/** The toolbar's Open button and the Cmd/Ctrl+O shortcut (D1, U2). */
 export function OpenButton() {
-  return <Button disabled>Open PDF</Button>;
+  return <FilePicker shortcut>Open PDF</FilePicker>;
 }

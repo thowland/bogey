@@ -13,6 +13,11 @@ export interface ViewState {
   /** 0-based index of the page shown. */
   page: number;
   zoom: Zoom;
+  /**
+   * The numeric zoom the page is shown at, with fit width and fit page resolved (spec §5.1);
+   * null until a page has been measured. The page view sets it.
+   */
+  renderedZoom: number | null;
   tool: Tool;
   selectedOverlayId: string | null;
   /** The signature to place when `tool` is 'signature' (S3 sets it, S4 consumes it). */
@@ -29,6 +34,7 @@ export interface ViewActions {
   setScreen(screen: Screen): void;
   setPage(page: number): void;
   setZoom(zoom: Zoom): void;
+  setRenderedZoom(zoom: number | null): void;
   setTool(tool: Tool): void;
   select(overlayId: string | null): void;
   chooseSignature(signatureId: string | null): void;
@@ -42,6 +48,7 @@ const initial: ViewState = {
   screen: 'workspace',
   page: 0,
   zoom: 'fit-width',
+  renderedZoom: null,
   tool: 'select',
   selectedOverlayId: null,
   selectedSignatureId: null,
@@ -56,6 +63,7 @@ export const useViewStore = create<ViewState & ViewActions>()((set) => ({
   setScreen: (screen) => set({ screen }),
   setPage: (page) => set({ page: Math.max(0, page) }),
   setZoom: (zoom) => set({ zoom }),
+  setRenderedZoom: (renderedZoom) => set({ renderedZoom }),
   setTool: (tool) => set({ tool, selectedOverlayId: null }),
   select: (selectedOverlayId) => set({ selectedOverlayId }),
   chooseSignature: (selectedSignatureId) =>

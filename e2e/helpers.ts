@@ -49,3 +49,48 @@ export const test = base.extend<{ violations: string[] }>({
 export { expect };
 
 // ── shell (Sprint 0) ──
+
+// ── viewer (Sprint 1) ──
+import type { Page } from '@playwright/test';
+
+/** Opens a fixture through the toolbar's file picker and, if given, answers the password dialog. */
+export async function openFixture(page: Page, path: string, password?: string): Promise<void> {
+  await page.getByTestId('open-input').setInputFiles({
+    name: path.split('/').pop()!,
+    mimeType: 'application/pdf',
+    buffer: fixture(path),
+  });
+  if (password !== undefined) {
+    const dialog = page.getByRole('dialog', { name: 'Password required' });
+    await dialog.getByLabel('Password').fill(password);
+    await dialog.getByRole('button', { name: 'Open' }).click();
+  }
+}
+
+/** Waits until the given 1-based page has been drawn, and returns its canvas's size. */
+export async function renderedPage(page: Page, number: number) {
+  const sheet = page.locator(`[data-page="${number}"][data-status="ready"]`);
+  await expect(sheet).toBeVisible();
+  return sheet.locator('canvas').evaluate((canvas: HTMLCanvasElement) => ({
+    width: canvas.width,
+    height: canvas.height,
+    cssWidth: canvas.getBoundingClientRect().width,
+    cssHeight: canvas.getBoundingClientRect().height,
+  }));
+}
+
+/** The share of sampled canvas pixels that are not white: a blank render scores 0. */
+export async function inkCoverage(page: Page, number: number): Promise<number> {
+  return page
+    .locator(`[data-page="${number}"][data-status="ready"] canvas`)
+    .evaluate((canvas: HTMLCanvasElement) => {
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      let inked = 0;
+      let sampled = 0;
+      for (let i = 0; i < data.length; i += 4 * 97) {
+        sampled++;
+        if (data[i]! < 240 || data[i + 1]! < 240 || data[i + 2]! < 240) inked++;
+      }
+      return inked / sampled;
+    });
+}

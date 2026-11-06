@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 import { ports } from '../../scripts/ports.mjs';
+import { pdfjsAssetsPlugin } from './plugins/pdfjsAssets.ts';
 import { devHeaders, previewHeaders } from './security/headers.ts';
 
 // Vite's static handler answers a revalidation with a bare 304 that carries none of
@@ -19,7 +20,7 @@ const previewHeadersOnEveryResponse = (): Plugin => ({
 const { dev, preview } = ports();
 
 export default defineConfig({
-  plugins: [react(), previewHeadersOnEveryResponse()],
+  plugins: [react(), previewHeadersOnEveryResponse(), pdfjsAssetsPlugin()],
   define: {
     // The commit being built (scripts/deploy.sh); the About page shows it (spec §11.7).
     __BOGEY_BUILD__: JSON.stringify(process.env.VITE_BOGEY_BUILD ?? 'dev'),
