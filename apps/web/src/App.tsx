@@ -1,13 +1,16 @@
 // The application shell (U1): toolbar across the top, thumbnails on the left, the page in the
 // center, and a collapsible right panel with Fields, Snippets and Signatures. Every region is
 // filled from a feature's index.ts, so concurrent sprints fill in their own feature without
-// editing this file (implementation plan §1.4).
+// editing this file (implementation plan §1.4). Below 1024 px (P3, spec §10.4) the thumbnail
+// strip becomes a toggle and the panel overlays the page, starting closed.
+import { useEffect, useState } from 'react';
 import { useDocumentStore } from './state/document.ts';
 import { useStorageStore } from './state/storage.ts';
 import { useViewStore, type PanelTab, type Screen } from './state/view.ts';
 import { ExportButton } from './features/export/index.ts';
 import { DocumentNotices, FieldsPanel } from './features/fields/index.ts';
-import { EmptyState, OpenButton } from './features/open/index.ts';
+import { ShortcutsHelp } from './features/help/index.ts';
+import { CloseButton, EmptyState, OpenButton } from './features/open/index.ts';
 import { ToolButtons, UndoRedo } from './features/overlays/index.ts';
 import { AboutPage, HelpPage, PrivacyPage } from './features/pages/index.ts';
 import { SettingsMenu } from './features/settings/index.ts';
@@ -27,6 +30,10 @@ const PAGES: Record<Exclude<Screen, 'workspace'>, () => React.JSX.Element> = {
   privacy: PrivacyPage,
 };
 
+/** P3: the width below which thumbnails and the panel overlay the page (App.module.css). */
+const NARROW = '(max-width: 1023px)';
+const isNarrow = () => typeof window.matchMedia === 'function' && window.matchMedia(NARROW).matches;
+
 const PANEL_TABS = [
   { key: 'fields', label: 'Fields', content: <FieldsPanel /> },
   { key: 'snippets', label: 'Snippets', content: <SnippetsPanel /> },
@@ -42,12 +49,36 @@ export function App() {
   const hasDocument = useDocumentStore((state) => state.status === 'ready');
   const saved = useStorageStore((state) => state.mode === 'persistent');
   const CurrentPage = screen === 'workspace' ? null : PAGES[screen];
+  const page = useViewStore((state) => state.page);
+  const [thumbsOpen, setThumbsOpen] = useState(false);
+  const [thumbsPage, setThumbsPage] = useState(page);
+  // Choosing a page in the overlaid strip closes it.
+  if (thumbsPage !== page) {
+    setThumbsPage(page);
+    setThumbsOpen(false);
+  }
+
+  useEffect(() => {
+    if (isNarrow()) useViewStore.getState().setPanel(false);
+  }, []);
 
   return (
     <div className={styles.app}>
       <header className={styles.toolbar}>
         <span className={styles.brand}>Bogey</span>
+        {hasDocument && (
+          <Button
+            variant="quiet"
+            className={styles.thumbsToggle}
+            aria-expanded={thumbsOpen}
+            aria-controls="thumbnail-strip"
+            onClick={() => setThumbsOpen(!thumbsOpen)}
+          >
+            {thumbsOpen ? 'Hide pages' : 'Pages'}
+          </Button>
+        )}
         <OpenButton />
+        <CloseButton />
         <ToolButtons />
         <UndoRedo />
         <span className={styles.spacer} />
@@ -66,6 +97,7 @@ export function App() {
             </Button>
           ))}
         </nav>
+        <ShortcutsHelp />
         <SettingsMenu />
         <Button
           variant="quiet"
@@ -80,7 +112,11 @@ export function App() {
       <DocumentNotices />
       <ErrorBoundary saved={saved} onReload={() => window.location.reload()}>
         <div className={styles.workspace} hidden={CurrentPage !== null}>
-          <aside className={styles.thumbs} aria-label="Pages">
+          <aside
+            id="thumbnail-strip"
+            className={[styles.thumbs, thumbsOpen ? styles.thumbsOpen : ''].join(' ')}
+            aria-label="Pages"
+          >
             <Thumbnails />
           </aside>
           <main className={styles.main}>{hasDocument ? <PageView /> : <EmptyState />}</main>

@@ -531,6 +531,151 @@ export function openSealedRecord(
   );
 }
 
+// ── touch and iPad (Sprint 8) ──
+
+/** The page sheet on screen (its neighbors are rendered hidden). */
+export function pageSheet(page: Page) {
+  return page.locator('[data-page]:not([hidden])');
+}
+
+/** The zoom the toolbar shows, for example "150%" or "Fit width". */
+export async function zoomLabel(page: Page): Promise<string> {
+  const name = await page.getByRole('button', { name: /^Zoom level: / }).getAttribute('aria-label');
+  return name!.replace('Zoom level: ', '');
+}
+
+/**
+ * A WebKit pinch over the element matching `selector`: gesturestart, a gesturechange per scale and
+ * a gestureend, dispatched in the page with their fields set the way Safari sets them. Returns
+ * whether every event was cancelled, and the page sheet's transform after the next-to-last change.
+ */
+export function pinchInPage(
+  page: Page,
+  selector: string,
+  scales: number[],
+): Promise<{ prevented: boolean; during: string }> {
+  return page.evaluate(
+    ({ selector, scales }) => {
+      const target = document.querySelector(selector)!;
+      const box = target.getBoundingClientRect();
+      const centre = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+      let prevented = true;
+      let during = '';
+      const send = (type: string, scale: number) => {
+        const event = new Event(type, { bubbles: true, cancelable: true });
+        Object.assign(event, { scale, ...centre });
+        target.dispatchEvent(event);
+        prevented &&= event.defaultPrevented;
+      };
+      send('gesturestart', 1);
+      scales.forEach((scale, index) => {
+        send('gesturechange', scale);
+        if (index === scales.length - 2) {
+          during =
+            document.querySelector<HTMLElement>('[data-page]:not([hidden])')?.style.transform ?? '';
+        }
+      });
+      send('gestureend', scales[scales.length - 1] ?? 1);
+      return { prevented, during };
+    },
+    { selector, scales },
+  );
+}
+
+/**
+ * A one-finger touch drag on the element matching `selector`, from `from` (CSS px from its
+ * top-left) by `dx`, `dy`: touch pointer events dispatched in the page, since Playwright can only
+ * tap. Its pointerId is one no real pointer uses.
+ */
+export function touchDragInPage(
+  page: Page,
+  selector: string,
+  from: { x: number; y: number },
+  dx: number,
+  dy: number,
+): Promise<void> {
+  return page.evaluate(
+    ({ selector, from, dx, dy }) => {
+      const target = document.querySelector(selector)!;
+      const box = target.getBoundingClientRect();
+      const send = (type: string, step: number) =>
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 41,
+            pointerType: 'touch',
+            isPrimary: true,
+            button: type === 'pointermove' ? -1 : 0,
+            buttons: type === 'pointerup' ? 0 : 1,
+            clientX: box.left + from.x + dx * step,
+            clientY: box.top + from.y + dy * step,
+          }),
+        );
+      send('pointerdown', 0);
+      for (const step of [0.25, 0.5, 0.75, 1]) send('pointermove', step);
+      send('pointerup', 1);
+    },
+    { selector, from, dx, dy },
+  );
+}
+
+// ── snippets and settings (Sprint 7) ──
+
+/** The N1 defaults, in their seeded order. */
+const SEEDED_SNIPPETS = [
+  'Full name',
+  'Address line 1',
+  'Address line 2',
+  'City/State/ZIP',
+  'Phone',
+  'Email',
+] as const;
+
+/** The Snippets panel, opened on its tab. */
+export async function snippetsPanel(page: Page) {
+  const panel = page.getByRole('complementary', { name: /fields, snippets and signatures/i });
+  await panel.getByRole('tab', { name: 'Snippets' }).click();
+  return panel;
+}
+
+/** Fills seeded snippets' values through Edit snippets, then returns to the snippet buttons. */
+export async function fillSnippets(
+  page: Page,
+  values: Partial<Record<(typeof SEEDED_SNIPPETS)[number], string>>,
+) {
+  const panel = await snippetsPanel(page);
+  await panel.getByRole('button', { name: 'Edit snippets' }).click();
+  for (const [label, value] of Object.entries(values)) {
+    const row = panel.getByRole('group', {
+      name: `Snippet ${SEEDED_SNIPPETS.indexOf(label as never) + 1}`,
+      exact: true,
+    });
+    await expect(row.getByLabel('Label')).toHaveValue(label);
+    await row.getByLabel('Value').fill(value);
+  }
+  await panel.getByRole('button', { name: 'Done' }).click();
+  return panel;
+}
+
+/** A snippet button in the panel, by its label (Today included). */
+export function snippetButton(panel: ReturnType<Page['getByRole']>, label: string) {
+  return panel.getByRole('list', { name: 'Snippets' }).getByRole('button', {
+    name: label,
+    exact: true,
+  });
+}
+
+/** Today in a format, from the test machine's clock (the browser shares it). */
+export function todayIn(format: 'MM/DD/YYYY' | 'YYYY-MM-DD'): string {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return format === 'YYYY-MM-DD'
+    ? `${now.getFullYear()}-${mm}-${dd}`
+    : `${mm}/${dd}/${now.getFullYear()}`;
+}
+
 // ── offline and security (Sprint 9) ──
 
 /** Waits until the service worker has precached the app and controls the page (spec §11.5). */

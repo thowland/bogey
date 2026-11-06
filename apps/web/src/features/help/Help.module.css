@@ -1,0 +1,55 @@
+/* The keyboard shortcuts dialog (U2). */
+
+.groups {
+  display: grid;
+  gap: var(--space-4);
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-base);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: var(--space-3);
+}
+
+.keys {
+  white-space: nowrap;
+}
+
+.action {
+  margin: 0;
+}
+
+.or {
+  color: var(--text-muted);
+}
+
+.kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  text-align: center;
+  background: var(--surface-sunken);
+}
