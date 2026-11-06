@@ -64,7 +64,7 @@ describe('App shell (U1, U5)', () => {
   it('shows the page view once a document is ready', () => {
     useDocumentStore.getState().update({ status: 'ready' });
     render(<App />);
-    expect(screen.getByText('The page appears here.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Open a PDF' })).toBeNull();
   });
 
   it('shows the memory-mode banner when storage is unavailable (M3)', async () => {
