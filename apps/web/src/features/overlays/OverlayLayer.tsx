@@ -19,7 +19,7 @@ export function OverlayLayer() {
   const zoom = useViewStore((state) => state.renderedZoom);
   const tool = useViewStore((state) => state.tool);
   const selectedId = useViewStore((state) => state.selectedOverlayId);
-  const geometry = useDocumentStore((state) => state.info?.pages[pageIndex]);
+  const geometry = useDocumentStore((state) => state.info?.pages?.[pageIndex]);
   const overlays = useEditsStore((state) => state.present.overlays);
   const editingId = useOverlayUi((state) => state.editingId);
   const draft = useOverlayUi((state) => state.draft);
@@ -92,7 +92,7 @@ function useLastPoint(root: RefObject<HTMLDivElement | null>, mounted: boolean) 
     const onDown = (event: globalThis.PointerEvent) => {
       const view = useViewStore.getState();
       if (view.tool !== 'select' || view.renderedZoom === null) return;
-      const geometry = useDocumentStore.getState().info?.pages[view.page];
+      const geometry = useDocumentStore.getState().info?.pages?.[view.page];
       if (!geometry) return;
       const box = sheet.getBoundingClientRect();
       const point = { x: event.clientX - box.left, y: event.clientY - box.top };

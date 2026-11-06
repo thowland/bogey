@@ -22,7 +22,7 @@ export const TOOL_NAMES: Readonly<Record<Tool, string>> = {
 export function currentPage(): { index: number; geometry: PageGeometry } | null {
   const info = useDocumentStore.getState().info;
   const index = useViewStore.getState().page;
-  const geometry = info?.pages[index];
+  const geometry = info?.pages?.[index];
   return geometry ? { index, geometry } : null;
 }
 
