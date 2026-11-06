@@ -30,3 +30,5 @@ export {
   type PageImage,
 } from './export/index.ts';
 export { outputFileName } from './naming.ts';
+// Sprint 3: signature image ops.
+export * from './image/index.ts';
