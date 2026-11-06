@@ -17,6 +17,11 @@ export interface DocumentState {
   display: PdfDisplayDocument | null;
   /** Held for the session only, never persisted (D3). */
   password: string | null;
+  /**
+   * The key sealing this document's saved edits, derived from the password (Sprint 6,
+   * security/sealing.ts). Memory only, never stored; null for documents without a password.
+   */
+  sealingKey: CryptoKey | null;
   problem: Problem | null;
 }
 
@@ -33,6 +38,7 @@ const initial: DocumentState = {
   info: null,
   display: null,
   password: null,
+  sealingKey: null,
   problem: null,
 };
 

@@ -1,0 +1,84 @@
+/* The recent documents list (D6). */
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  cursor: pointer;
+}
+
+.thumb {
+  flex: none;
+  width: 3rem;
+  height: 4rem;
+  object-fit: contain;
+  object-position: top;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.text {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.locked {
+  display: grid;
+  place-content: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: 1.1;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.lockedText {
+  font-size: 0.5625rem;
+}

@@ -12,7 +12,7 @@ import { TIMING } from '../config.ts';
 
 export const DB_NAME = 'bogey';
 export const DB_VERSION = 1;
-export const RECORD_SCHEMA_VERSION = 1;
+export const RECORD_SCHEMA_VERSION = 2;
 
 export type Zoom = number | 'fit-width' | 'fit-page';
 
@@ -32,6 +32,19 @@ export interface DocumentRecord {
   fieldValues: FieldValues;
   overlays: readonly Overlay[];
   schemaVersion: number;
+  /**
+   * Password-protected documents only: their field values and overlays, encrypted with a key
+   * derived from the password (security/sealing.ts). `fieldValues` and `overlays` are then empty.
+   */
+  sealed?: SealedEdits;
+}
+
+/** AES-GCM ciphertext of `{ fieldValues, overlays }`, with the PBKDF2 salt (Sprint 6). */
+export interface SealedEdits {
+  v: 1;
+  salt: ArrayBuffer;
+  iv: ArrayBuffer;
+  data: ArrayBuffer;
 }
 
 export interface BytesRecord {
