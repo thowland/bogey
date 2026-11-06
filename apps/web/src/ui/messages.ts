@@ -50,8 +50,8 @@ const MESSAGES: Record<ProblemCode, (data: Data) => string> = {
     'This browser could not read that image. PNG and JPEG work everywhere; HEIC works only in Safari.',
   // ── snippets ──
   'snippets.malformed': () => 'That file is not a Bogey snippets file, so nothing was imported.',
-  'snippets.too-large': () =>
-    'That snippets file is larger than Bogey accepts, so nothing was imported.',
+  'snippets.too-large': (data) =>
+    SNIPPET_LIMIT_TEXT.get(String(data?.limit)) ?? SNIPPET_LIMIT_TEXT.get('file')!,
 };
 
 export function messageFor(problem: Problem): string {
@@ -71,3 +71,25 @@ export const NOTICES = Object.freeze({
   manyPages: (pages: number) =>
     `This document has ${pages.toLocaleString('en-US')} pages. Bogey shows one page at a time, and on an iPad each page may take a few seconds to draw.`,
 });
+
+// ── snippets (Sprint 7) ──
+
+/** What `snippets.too-large` says for each limit core reports (spec §10.6). */
+const SNIPPET_LIMIT_TEXT: ReadonlyMap<string, string> = new Map([
+  [
+    'file',
+    'That snippets file is over 256 KB, which is more than Bogey accepts, so nothing was imported.',
+  ],
+  [
+    'count',
+    'That file has more than 200 snippets, which is more than Bogey accepts, so nothing was imported.',
+  ],
+  [
+    'label',
+    'A label in that file is longer than 60 characters, which is more than Bogey accepts, so nothing was imported.',
+  ],
+  [
+    'value',
+    'A value in that file is longer than 2,000 characters, which is more than Bogey accepts, so nothing was imported.',
+  ],
+]);

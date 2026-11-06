@@ -32,3 +32,5 @@ export {
 export { outputFileName } from './naming.ts';
 // Sprint 3: signature image ops.
 export * from './image/index.ts';
+// Sprint 7: snippet files and merging.
+export * from './snippets/index.ts';
