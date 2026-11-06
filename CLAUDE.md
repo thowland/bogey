@@ -12,7 +12,7 @@ Bogey is a browser-only PDF fill-and-sign tool: open a PDF, fill its form fields
 
 ## Status
 
-Waves 0 and 1 are merged (tags `sprint-00` to `sprint-03`): the shell, viewer (open, render, thumbnails, zoom, password), PDF core (geometry, inspection, edits and undo, export with active-content stripping, decryption, pdf worker) and signature capture (draw with Pencil pressure, upload with background removal, library). Wave 2 (Sprints 4–6, the MVP) is next; the plan's §4 lists what it builds on. Update this section as sprints land.
+Waves 0–2 are merged (tags `sprint-00` to `sprint-06`); the MVP is live: open, view, fill fields, place text, checks, dates and signatures, undo, export a flattened PDF, autosave and restore, recent documents, sealed edits for encrypted documents. Wave 3 (Sprints 7–9) is next; the plan's §4 lists what it builds on. Update this section as sprints land.
 
 ## Commands
 
@@ -68,6 +68,7 @@ E2E runs against the production build via `vite preview`. Ports come from `scrip
   - pdf.js lives in `src/pdfjs/`: one long-lived `PDFWorker`, a shared render queue, and `AnnotationMode.ENABLE_FORMS` with a canvas map for AcroForm documents (spec §10.3).
   - One zustand store per file in `src/state/`, each owned by one sprint.
   - `state/persistence.ts` owns IndexedDB (`bogey` database) behind a `Repository` with an ordered queue, in-memory fallback and fail-closed clear; original PDF bytes live in their own `documentBytes` store. Binary values are stored as `ArrayBuffer`, never `Blob` (WebKit aborts Blob writes intermittently).
+  - `state/session.ts` autosaves the active document (500 ms debounce, flush on hide), restores on load, and seals edits of encrypted documents with `security/sealing.ts` (spec §10.5).
   - App limits live in `src/config.ts`; problem codes and their user text in `src/ui/messages.ts`.
 - The pdf-lib fork deletes a document's XFA whenever `getForm()` runs (saving included) unless loaded with `preserveXFA: true`.
 - Browser-mode tests: list every package they import in `vitest.config.ts` (`CORE_BROWSER_DEPS` / `WEB_BROWSER_DEPS`), or Vite re-optimizes mid-run on a cold cache and the post-merge gate fails. Tests under the E2E violation fixture take no screenshots (WebKit reports Playwright's injected style).

@@ -1,6 +1,6 @@
 # Bogey – Technical Specification
 
-Status: Draft 2 · 2026-11-06 (wave 1 findings folded in)
+Status: Draft 3 · 2026-11-06 (waves 1 and 2 folded in)
 Companion to: `docs/VISION.md` and `docs/REQUIREMENTS.md` (referred to below as "the vision" and "the requirements")
 
 This document describes how Bogey is built: the repository layout, the boundary between the pure document library and the web application, the geometry model, form handling, overlays, signatures, export, persistence, the service worker, security, testing and release. Requirement IDs (D1, F3, X5 and so on) refer to the requirements. Where the requirements leave a choice open, this document makes one; where it departs from the requirements, the departure is listed in §16 with its reason so it can be confirmed or reversed. Appendix A maps every requirement ID to the section that satisfies it.
@@ -521,7 +521,7 @@ Layout follows U1: toolbar across the top, thumbnail strip on the left, page vie
 
 ### 10.5 Persistence (M1–M4, D5–D7)
 
-IndexedDB database `bogey`, version 1:
+IndexedDB database `bogey`, version 1 (record schema version 2, see below):
 
 | Store | Key | Value |
 | --- | --- | --- |
@@ -537,6 +537,7 @@ The original bytes moved out of `documents` into `documentBytes` (§16): the byt
 
 - **Writes** (M1): the document record is written 500 ms after the last edit, and at once on `visibilitychange` to hidden and on `pagehide`. iPadOS may suspend the page before a transaction started on `pagehide` commits, so the hidden-state flush is the one that matters there; the worst case is the last 500 ms of edits. All storage work runs through one ordered queue, so a record never references bytes that have not been written.
 - **Recent list** (D6): when a 21st document is added, the least recently updated one other than the active document is deleted (record and bytes in one transaction). Documents not updated for 30 days are also deleted on load (`config.ts`), because signed forms containing personal details should not accumulate on a shared machine indefinitely (§16). Signatures and snippets are kept until the user deletes them or clears everything.
+- **Encrypted documents at rest** (decided 2026-11-06). The original stays encrypted and the password is never stored. No thumbnail is stored for an encrypted document; the recent list shows a "Password-protected" placeholder. Its edits are sealed (`security/sealing.ts`): a key derived from the document's password with PBKDF2-HMAC-SHA-256 (600,000 iterations, a random 16-byte salt per document) encrypts `{ fieldValues, overlays }` with AES-GCM-256, a fresh 12-byte IV per write, and the document id as additional authenticated data, stored as `sealed: { v, salt, iv, data }` with empty plaintext fields. The key is held in memory only (`state/document.ts`, `sealingKey`). A restore that fails to decrypt opens the document without its saved edits and shows a notice; it never falls back to plaintext. Documents protected only by an owner password open without one, so there is nothing to derive a key from, and their edits are stored like an unprotected document's: anyone who can read the browser profile can already read such a file. Schema version 2 added `sealed` and, as a one-time migration, removed thumbnails and plaintext edits from encrypted records saved before sealing existed.
 - **Restore** (D7): on load, `settings.activeDocumentId` is read; if its record and bytes exist, the document reopens at its saved page and zoom. An encrypted document asks for its password first, and Cancel shows the recent list. If the record or bytes are missing (Safari evicted them, or the user cleared site data), the app shows the empty state with a notice and does not fail.
 - **Migrations**: records carry `schemaVersion`; a migration table upgrades older records, and a record that cannot be read is deleted with a notice, as in Mulligan.
 - **Storage budget**: before storing bytes, `navigator.storage.estimate()` is checked; if the file would bring usage above 80% of quota, the document opens in memory only with a notice ("Opened, but not saved on this device"). `QuotaExceededError` on any write switches the app to in-memory mode (M3).
