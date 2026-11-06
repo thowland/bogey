@@ -63,8 +63,12 @@ export function FieldsPanel() {
                 aria-label={`${row.label}, ${row.kind}, page ${(row.field.widgets[0]?.page ?? 0) + 1}: ${row.value}`}
                 onClick={() => open(row)}
               >
-                <span className={styles.label}>{row.label}</span>
-                <span className={styles.kind}>{row.kind}</span>
+                {/* The page is shown too, and the parts are spaced, so the visible text reads as
+                    the name does (WCAG 2.5.3). Spaces between grid items take no room. */}
+                <span className={styles.label}>{row.label}</span>{' '}
+                <span className={styles.kind}>
+                  {row.kind}, page {(row.field.widgets[0]?.page ?? 0) + 1}
+                </span>{' '}
                 <span className={styles.value}>{row.value}</span>
               </button>
             </li>

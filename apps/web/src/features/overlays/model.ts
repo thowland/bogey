@@ -249,3 +249,16 @@ export function overlayLabel(overlay: Overlay, signatureName?: string): string {
       return `Signature overlay: ${signatureName ?? 'deleted from the library'}, ${where}`;
   }
 }
+
+/** Where a keyboard placement goes when the page has not been clicked: this far in, in points. */
+export const KEYBOARD_INSET_PT = { x: 108, y: 72 };
+
+/**
+ * The point, in CSS px from the page's top-left corner, where a keyboard placement goes: the last
+ * point clicked on this page, or a little in from its top-left corner as displayed (U4).
+ */
+export function keyboardPoint(page: PageGeometry, zoom: number, last: Point | null): Point {
+  if (last) return pdfToScreen(page, last, zoom);
+  const k = scaleFor(page, zoom);
+  return { x: KEYBOARD_INSET_PT.x * k, y: KEYBOARD_INSET_PT.y * k };
+}

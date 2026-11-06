@@ -42,6 +42,10 @@ export function PageView() {
       className={styles.area}
       role="region"
       aria-label={`Page ${page + 1} of ${display.pageCount}`}
+      // A tab stop, so the keyboard can scroll a zoomed page that has no controls on it (U4, axe
+      // scrollable-region-focusable); a named region is the pattern WCAG gives for this.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
     >
       {areaSize &&
         pagesAround(page, display.pageCount, LIMITS.renderedNeighbors).map((index) => (

@@ -432,6 +432,70 @@ describe('selection and manipulation', () => {
   });
 });
 
+describe('placing from the keyboard (U4)', () => {
+  const marker = () => screen.getByRole('button', { name: /^Place .+ here$/ });
+
+  it('focuses a marker near the top-left corner, and Enter places there and focuses the overlay', async () => {
+    render(<Page />);
+    const user = userEvent.setup();
+    await user.keyboard('c');
+    expect(marker()).toHaveAccessibleName('Place check here');
+    expect(marker()).toHaveFocus();
+    expect(marker().style.left).toBe(`${108 * K}px`);
+    expect(marker().style.top).toBe(`${72 * K}px`);
+    await user.keyboard('{Enter}');
+    expect(useViewStore.getState().tool).toBe('select');
+    expect(overlays()).toHaveLength(1);
+    expect(overlays()[0]).toMatchObject({ type: 'check', x: 102, y: 714 });
+    expect(screen.getByRole('button', { name: 'Check mark overlay, page 1' })).toHaveFocus();
+    // Delete from the keyboard hands focus to the Select tool rather than dropping it.
+    await user.keyboard('{Delete}');
+    expect(overlays()).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveFocus();
+  });
+
+  it('marks the last point clicked on this page, and opens text for typing', async () => {
+    useViewStore.getState().setLastPoint({ page: 0, point: { x: 300, y: 400 } });
+    render(<Page />);
+    const user = userEvent.setup();
+    await user.keyboard('t');
+    const at = pdfToScreen(geometry(0), { x: 300, y: 400 }, 1);
+    expect(parseFloat(marker().style.left)).toBeCloseTo(at.x, 2);
+    expect(parseFloat(marker().style.top)).toBeCloseTo(at.y, 2);
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('textbox', { name: /^Text overlay/ })).toHaveFocus();
+    await user.keyboard('Hi{Enter}');
+    expect(overlays()[0]).toMatchObject({ type: 'text', text: 'Hi', x: 300, y: 400 });
+  });
+
+  it('ignores a last point on another page', async () => {
+    useViewStore.getState().setLastPoint({ page: 1, point: { x: 300, y: 400 } });
+    render(<Page />);
+    await userEvent.setup().keyboard('d');
+    expect(marker().style.left).toBe(`${108 * K}px`);
+  });
+
+  it('gives focus back when the tool is left without placing', async () => {
+    render(<Page />);
+    const user = userEvent.setup();
+    const button = screen.getByRole('button', { name: 'Text' });
+    button.focus();
+    await user.keyboard('{Enter}');
+    expect(marker()).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('button', { name: /^Place .+ here$/ })).toBeNull();
+    expect(button).toHaveFocus();
+  });
+
+  it('leaves pointer placement as it was', () => {
+    render(<Page />);
+    act(() => chooseTool('check'));
+    expect(marker()).toBeInTheDocument();
+    tap(120, 150);
+    expect(overlays()).toHaveLength(1);
+  });
+});
+
 describe('the last point and selection on the page', () => {
   it('records lastPoint on any press in select mode and clears the selection off overlays', () => {
     useEditsStore.getState().edit({

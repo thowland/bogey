@@ -3,8 +3,6 @@
 .groups {
   display: grid;
   gap: var(--space-4);
-  max-height: 70vh;
-  overflow: auto;
 }
 
 .note {

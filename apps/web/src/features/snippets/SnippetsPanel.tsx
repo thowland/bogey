@@ -196,45 +196,41 @@ function UseList({ items, onResult }: { items: readonly Snippet[]; onResult(text
     <>
       <TargetLine />
       <ul className={styles.list} aria-label="Snippets">
-        <li>
+        {/* The value is drawn over the button but sits outside it, so the button's name is just
+            its label, the visible text inside it (WCAG 2.5.3), and the value is its description. */}
+        <li className={styles.item}>
           <button
             type="button"
             className={styles.snippet}
             disabled={!ready}
-            aria-labelledby={`${hintId}-today-label`}
             aria-describedby={`${hintId}-today`}
             onPointerDown={keepFocus}
             onClick={() => use(today, 'Today', true)}
           >
-            <span id={`${hintId}-today-label`} className={styles.label}>
-              Today
-            </span>
-            <span id={`${hintId}-today`} className={styles.value} data-format={dateFormat}>
-              {today}
-            </span>
+            <span className={styles.label}>Today</span>
           </button>
+          <span id={`${hintId}-today`} className={styles.value} data-format={dateFormat}>
+            {today}
+          </span>
         </li>
         {items.map((item) => {
           const empty = item.value === '';
           const label = item.label.trim() || 'Untitled';
           return (
-            <li key={item.id}>
+            <li key={item.id} className={styles.item}>
               <button
                 type="button"
                 className={styles.snippet}
                 disabled={!ready || empty}
-                aria-labelledby={`${hintId}-${item.id}-label`}
                 aria-describedby={`${hintId}-${item.id}`}
                 onPointerDown={keepFocus}
                 onClick={() => use(item.value, label)}
               >
-                <span id={`${hintId}-${item.id}-label`} className={styles.label}>
-                  {label}
-                </span>
-                <span id={`${hintId}-${item.id}`} className={styles.value}>
-                  {empty ? 'Empty. Choose Edit snippets to fill it in.' : item.value}
-                </span>
+                <span className={styles.label}>{label}</span>
               </button>
+              <span id={`${hintId}-${item.id}`} className={styles.value}>
+                {empty ? 'Empty. Choose Edit snippets to fill it in.' : item.value}
+              </span>
             </li>
           );
         })}
@@ -358,48 +354,49 @@ function EditRow({ item, index, focus }: { item: Snippet; index: number; focus: 
   return (
     <li
       ref={setNodeRef}
-      className={styles.row}
+      className={styles.editItem}
       data-dragging={isDragging || undefined}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      aria-label={`Snippet ${index + 1}`}
-      role="group"
     >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className={styles.handle}
-        {...attributes}
-        {...listeners}
-        aria-label={`Move ${label}`}
-      >
-        <span aria-hidden="true">⠿</span>
-      </button>
-      <div className={styles.inputs}>
-        <label htmlFor={labelId} className={styles.inputLabel}>
-          Label
-        </label>
-        <input
-          id={labelId}
-          className={styles.input}
-          value={item.label}
-          maxLength={SNIPPET_LIMITS.maxLabel}
-          ref={labelInput}
-          onChange={(event) => void edit(item.id, { label: event.target.value })}
-        />
-        <label htmlFor={valueId} className={styles.inputLabel}>
-          Value
-        </label>
-        <input
-          id={valueId}
-          className={styles.input}
-          value={item.value}
-          maxLength={SNIPPET_LIMITS.maxValue}
-          onChange={(event) => void edit(item.id, { value: event.target.value })}
-        />
+      {/* A list may hold only list items, so the group is inside the item. */}
+      <div className={styles.row} role="group" aria-label={`Snippet ${index + 1}`}>
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className={styles.handle}
+          {...attributes}
+          {...listeners}
+          aria-label={`Move ${label}`}
+        >
+          <span aria-hidden="true">⠿</span>
+        </button>
+        <div className={styles.inputs}>
+          <label htmlFor={labelId} className={styles.inputLabel}>
+            Label
+          </label>
+          <input
+            id={labelId}
+            className={styles.input}
+            value={item.label}
+            maxLength={SNIPPET_LIMITS.maxLabel}
+            ref={labelInput}
+            onChange={(event) => void edit(item.id, { label: event.target.value })}
+          />
+          <label htmlFor={valueId} className={styles.inputLabel}>
+            Value
+          </label>
+          <input
+            id={valueId}
+            className={styles.input}
+            value={item.value}
+            maxLength={SNIPPET_LIMITS.maxValue}
+            onChange={(event) => void edit(item.id, { value: event.target.value })}
+          />
+        </div>
+        <Button variant="quiet" aria-label={`Delete ${label}`} onClick={() => void remove(item.id)}>
+          Delete
+        </Button>
       </div>
-      <Button variant="quiet" aria-label={`Delete ${label}`} onClick={() => void remove(item.id)}>
-        Delete
-      </Button>
     </li>
   );
 }
