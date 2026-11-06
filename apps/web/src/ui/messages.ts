@@ -93,3 +93,11 @@ const SNIPPET_LIMIT_TEXT: ReadonlyMap<string, string> = new Map([
     'A value in that file is longer than 2,000 characters, which is more than Bogey accepts, so nothing was imported.',
   ],
 ]);
+
+// ── offline (Sprint 9) ──
+
+/** The update prompt (spec §11.5, B7): a new build's service worker is waiting. */
+export const UPDATE_PROMPT = Object.freeze({
+  text: 'A new version is ready. Reload to update.',
+  action: 'Reload',
+});

@@ -115,6 +115,10 @@ export default defineConfig({
         'apps/web/src/main.tsx', // React root mount; exercised by the production build and E2E.
         // The pdf worker's bootstrap line (expose); its API is tested in workers/pdfWorkerApi.ts.
         'apps/web/src/workers/pdf.worker.ts',
+        // The service worker's event wiring, which runs only as /sw.js in a browser; exercised by
+        // e2e/offline.spec.ts and, built, by test/serviceWorker.test.ts. Its decisions are in
+        // src/sw/manifest.ts, which is covered (implementation plan §1.3).
+        'apps/web/src/sw/sw.ts',
       ],
       reporter: ['text', 'html', 'json-summary'],
       thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },

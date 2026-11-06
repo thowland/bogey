@@ -3,9 +3,11 @@
 
 // Checks a deployed Bogey against apps/web/security/headers.json:
 //   node scripts/check-live-headers.mjs https://bogey.beta-site.us
-// Every header must match exactly on the page, the main script, every worker the main script
-// references, and /sw.js once it exists, and on a 304 revalidation too, since WebKit checks COEP
-// against the 304 when it loads a worker (spec §11.7). Plain HTTP must redirect to HTTPS, and a
+// Every header must match exactly on the page, the main script, both workers (the pdf worker and
+// the pdf.js worker, found in the main script and the chunks it loads), and /sw.js, and on a 304
+// revalidation too, since WebKit checks COEP against the 304 when it loads a worker and the
+// service worker caches what it is served (spec §11.5, §11.7). /sw.js must be no-cache and must
+// precache both workers. Plain HTTP must redirect to HTTPS, and a
 // POST must be refused (spec §11.3, T9). Exits non-zero on any mismatch.
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
@@ -47,6 +49,7 @@ checkHeaders('/', page);
 const script = page.body.match(/<script[^>]+src="([^"]+)"/)?.[1];
 if (!script) problems.push('/: no module script found');
 const assets = [];
+const workers = [];
 if (script) {
   const main = await get(new URL(script, site));
   if (main.status !== 200) problems.push(`${script}: status ${main.status}`);
@@ -58,16 +61,40 @@ if (script) {
   }
   checkHeaders(script, main);
   assets.push(script);
-  for (const match of main.body.matchAll(/["'`(]([^"'`()]*worker[\w.]*-[\w-]+\.m?js)/g)) {
+  // The pdf.js worker is referenced from a lazily loaded chunk, so look one level down too.
+  const bodies = [{ base: script, body: main.body }];
+  for (const match of main.body.matchAll(/["'`(](\.{1,2}\/[\w.-]+-[\w-]+\.js)["'`)]/g)) {
     const path = new URL(match[1], new URL(script, site)).pathname;
-    if (!assets.includes(path)) assets.push(path);
+    if (/worker/.test(path)) continue;
+    const chunk = await get(new URL(path, site));
+    if (chunk.status === 200) bodies.push({ base: path, body: chunk.body });
   }
+  for (const { base, body } of bodies) {
+    for (const match of body.matchAll(/["'`(]([^"'`()]*worker[\w.]*-[\w-]+\.m?js)/g)) {
+      const path = new URL(match[1], new URL(base, site)).pathname;
+      if (!workers.includes(path)) workers.push(path);
+    }
+  }
+  if (workers.length < 2) {
+    problems.push(`expected the pdf worker and the pdf.js worker, found: ${workers.join(', ')}`);
+  }
+  assets.push(...workers);
 }
 const sw = await get(new URL('/sw.js', site));
-if (sw.status === 200) {
+if (sw.status !== 200) problems.push(`/sw.js: status ${sw.status}`);
+else {
   assets.push('/sw.js');
   if (sw.headers['cache-control'] !== 'no-cache') {
     problems.push(`/sw.js: cache-control ${sw.headers['cache-control']}`);
+  }
+  if (!/javascript/.test(sw.headers['content-type'] ?? '')) {
+    problems.push(`/sw.js: content-type ${sw.headers['content-type']}`);
+  }
+  // A kill switch (scripts/sw-kill.ts) precaches nothing; a normal build precaches both workers.
+  if (!sw.body.includes('kill switch')) {
+    for (const worker of workers) {
+      if (!sw.body.includes(worker)) problems.push(`/sw.js: does not precache ${worker}`);
+    }
   }
 }
 for (const path of assets.slice(1)) {

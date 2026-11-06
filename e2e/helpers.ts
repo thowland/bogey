@@ -675,3 +675,115 @@ export function todayIn(format: 'MM/DD/YYYY' | 'YYYY-MM-DD'): string {
     ? `${now.getFullYear()}-${mm}-${dd}`
     : `${mm}/${dd}/${now.getFullYear()}`;
 }
+
+// ── offline and security (Sprint 9) ──
+
+/** Waits until the service worker has precached the app and controls the page (spec §11.5). */
+export async function serviceWorkerReady(page: Page): Promise<void> {
+  await expect
+    // Test code reading the page's state; the lint rule keeps app code out of the worker API.
+    // eslint-disable-next-line no-restricted-syntax
+    .poll(() => page.evaluate(() => navigator.serviceWorker?.controller !== null), {
+      timeout: 60_000,
+    })
+    .toBe(true);
+}
+
+import { readdirSync } from 'node:fs';
+import * as pdfLib from '../tooling/node_modules/@cantoo/pdf-lib/es/index.js';
+
+/**
+ * Every path the production build publishes (apps/web/dist), `/`-rooted: the request allow-list's
+ * "build manifest" (spec §11.3, S1).
+ */
+export function buildPaths(): Set<string> {
+  const dist = `${root}apps/web/dist/`;
+  const walk = (dir: string): string[] =>
+    readdirSync(`${dist}${dir}`, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? walk(`${dir}${entry.name}/`) : [`/${dir}${entry.name}`],
+    );
+  return new Set(walk(''));
+}
+
+/**
+ * The active content a reader could act on in a PDF, found by walking every object reachable from
+ * the trailer: JavaScript, Launch, SubmitForm and other non-navigation actions, additional
+ * actions, an OpenAction, `javascript:` URIs, and links that still carry an action. Returns a
+ * description of each find; an empty list means none (spec §9.1 step 4).
+ */
+export async function activeContent(bytes: Uint8Array): Promise<string[]> {
+  const {
+    PDFDocument: Doc,
+    PDFArray,
+    PDFDict,
+    PDFName,
+    PDFRef,
+    PDFRawStream,
+    PDFString,
+    PDFHexString,
+    decodePDFRawStream,
+  } = pdfLib;
+  const doc = await Doc.load(bytes, { updateMetadata: false });
+  const found: string[] = [];
+  const seen = new Set<unknown>();
+  // Action types that run code, launch, submit, import, or change the document; /S is also used
+  // by harmless dictionaries (groups, page labels, structure), so this is a list of what to flag.
+  const ACTIVE = new Set(
+    'JavaScript Launch SubmitForm ImportData ResetForm Rendition Sound Movie GoToR GoToE Hide SetOCGState RichMediaExecute GoTo3DView'.split(
+      ' ',
+    ),
+  );
+  const visit = (node: unknown, path: string): void => {
+    if (node instanceof PDFRef) {
+      if (seen.has(node.toString())) return;
+      seen.add(node.toString());
+      visit(doc.context.lookup(node), path);
+      return;
+    }
+    if (node instanceof PDFString || node instanceof PDFHexString) {
+      if (/^\s*javascript:/i.test(node.decodeText())) found.push(`${path}: javascript: URI`);
+      return;
+    }
+    if (node instanceof PDFArray) {
+      node.asArray().forEach((child, i) => visit(child, `${path}[${i}]`));
+      return;
+    }
+    const dict = node instanceof PDFRawStream ? node.dict : node;
+    if (!(dict instanceof PDFDict)) return;
+    const action = dict.get(PDFName.of('S'));
+    if (action instanceof PDFName && ACTIVE.has(action.decodeText())) {
+      found.push(`${path}: /S /${action.decodeText()}`);
+    }
+    for (const key of ['JS', 'AA', 'OpenAction', 'JavaScript', 'Launch', 'SubmitForm']) {
+      if (dict.has(PDFName.of(key))) found.push(`${path}: /${key}`);
+    }
+    const subtype = dict.get(PDFName.of('Subtype'));
+    if (
+      subtype instanceof PDFName &&
+      subtype.decodeText() === 'Link' &&
+      dict.has(PDFName.of('A'))
+    ) {
+      const a = dict.lookup(PDFName.of('A'));
+      const uri = a instanceof PDFDict ? a.lookup(PDFName.of('URI')) : undefined;
+      const target =
+        uri instanceof PDFString || uri instanceof PDFHexString ? uri.decodeText() : '';
+      if (!/^(https?|mailto):/i.test(target)) found.push(`${path}: link with an action`);
+    }
+    if (
+      node instanceof PDFRawStream &&
+      dict.lookup(PDFName.of('Type')) === PDFName.of('EmbeddedFile')
+    ) {
+      return;
+    }
+    if (
+      node instanceof PDFRawStream &&
+      /javascript:/i.test(Buffer.from(decodePDFRawStream(node).decode()).toString('latin1'))
+    ) {
+      found.push(`${path}: javascript: in a stream`);
+    }
+    for (const [key, value] of dict.entries()) visit(value, `${path}/${key.decodeText()}`);
+  };
+  visit(doc.context.trailerInfo.Root, 'Root');
+  visit(doc.context.trailerInfo.Info, 'Info');
+  return found;
+}
