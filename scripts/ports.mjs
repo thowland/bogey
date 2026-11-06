@@ -22,5 +22,5 @@ export function portBase(path = root, override = process.env.BOGEY_PORT_BASE) {
 
 export const ports = (path) => {
   const base = portBase(path);
-  return { dev: base + 2, preview: base, e2e: base + 1 };
+  return { dev: base + 2, preview: base, e2e: base + 1, vitest: base + 3 };
 };

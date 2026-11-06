@@ -1,8 +1,12 @@
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig, type TestProjectConfiguration } from 'vitest/config';
+import { ports } from './scripts/ports.mjs';
 
 type Engine = 'chromium' | 'firefox' | 'webkit';
 const ENGINES: Engine[] = ['chromium', 'firefox', 'webkit'];
+// Each checkout gets its own browser-mode server port so worktrees can test concurrently
+// (implementation plan §1.4); engines in one run share it.
+const BROWSER_API = { port: ports().vitest, strictPort: false };
 
 /** One browser-mode project per engine. Only Chromium feeds v8 coverage (implementation plan §1.3). */
 function browserProjects(
@@ -22,6 +26,7 @@ function browserProjects(
         provider: playwright(),
         instances: [{ browser: engine }],
         screenshotFailures: false,
+        api: BROWSER_API,
       },
     },
   }));

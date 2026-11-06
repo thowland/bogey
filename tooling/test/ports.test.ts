@@ -25,6 +25,7 @@ describe('ports per checkout (implementation plan §1.4)', () => {
       preview: portBase(),
       e2e: portBase() + 1,
       dev: portBase() + 2,
+      vitest: portBase() + 3,
     });
   });
 });
