@@ -8,25 +8,50 @@ const ENGINES: Engine[] = ['chromium', 'firefox', 'webkit'];
 // (implementation plan §1.4); engines in one run share it.
 const BROWSER_API = { port: ports().vitest, strictPort: false };
 
+// Dependencies the browser-mode tests import, pre-bundled up front. Left to discovery, Vite finds
+// them partway through a run on a cold cache, re-optimizes and reloads the page, which loads React
+// twice and fails test imports; the gate on master after a merge always starts cold for new
+// imports. Add a package here when a browser test (or code it loads) starts importing it.
+const CORE_BROWSER_DEPS = ['@cantoo/pdf-lib', 'zod', 'fast-check'];
+const WEB_BROWSER_DEPS = [
+  'react',
+  'react/jsx-dev-runtime',
+  'react/jsx-runtime',
+  'react-dom',
+  'react-dom/client',
+  'zustand',
+  'idb',
+  'comlink',
+  'pdfjs-dist',
+  '@dnd-kit/core',
+  '@dnd-kit/sortable',
+  '@dnd-kit/utilities',
+  '@testing-library/react',
+  '@testing-library/user-event',
+  'fast-check',
+  '@bogey/core > @cantoo/pdf-lib',
+  '@bogey/core > zod',
+];
+
 /** One browser-mode project per engine. Only Chromium feeds v8 coverage (implementation plan §1.3). */
 function browserProjects(
   name: string,
-  include: string[],
-  app?: { extends: string; root: string },
+  options: { root: string; include: string[]; deps: string[]; extends?: string },
 ): TestProjectConfiguration[] {
   return ENGINES.map((engine) => ({
-    ...(app ? { extends: app.extends } : {}),
+    ...(options.extends ? { extends: options.extends } : {}),
+    optimizeDeps: { include: options.deps },
     test: {
       name: `${name}:${engine}`,
-      ...(app ? { root: app.root } : {}),
-      include,
+      root: options.root,
+      include: options.include,
+      api: BROWSER_API,
       browser: {
         enabled: true,
         headless: true,
         provider: playwright(),
         instances: [{ browser: engine }],
         screenshotFailures: false,
-        api: BROWSER_API,
       },
     },
   }));
@@ -42,7 +67,11 @@ export default defineConfig({
           environment: 'node',
         },
       },
-      ...browserProjects('core', ['packages/core/test/**/*.test.ts']),
+      ...browserProjects('core', {
+        root: './packages/core',
+        include: ['test/**/*.test.ts'],
+        deps: CORE_BROWSER_DEPS,
+      }),
       {
         extends: './apps/web/vite.config.ts',
         test: {
@@ -55,9 +84,11 @@ export default defineConfig({
         },
       },
       // Tests that need a real browser: canvas, IndexedDB, pdf.js rendering, pointer events.
-      ...browserProjects('web', ['test/**/*.browser.test.{ts,tsx}'], {
+      ...browserProjects('web', {
         extends: './apps/web/vite.config.ts',
         root: './apps/web',
+        include: ['test/**/*.browser.test.{ts,tsx}'],
+        deps: WEB_BROWSER_DEPS,
       }),
       {
         test: {
