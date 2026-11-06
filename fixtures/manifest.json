@@ -240,7 +240,7 @@
     "formType": "flat",
     "xfa": "none",
     "encrypted": true,
-    "password": "p\u00e4ssw\u00f6rt",
+    "password": "pässwört",
     "rotation": [
       0
     ],
@@ -337,24 +337,6 @@
     "pageCount": 1,
     "purpose": "text fields in single-line, multiline and comb variants",
     "committed": false
-  },
-  {
-    "path": "fixtures/fetched/qpdf/V4-aes.pdf",
-    "source": "qpdf",
-    "license": "Apache-2.0",
-    "sha256": "1d8a812844b8d8c7ba085a627eb3b7ab52aa651c6143ca07315084220a113240",
-    "formType": "flat",
-    "xfa": "none",
-    "encrypted": true,
-    "password": "",
-    "rotation": [
-      0
-    ],
-    "cropOrigin": false,
-    "pageCount": 30,
-    "purpose": "AES-128 (V4/R4) with empty user and owner passwords",
-    "committed": false,
-    "cipher": "AES-128"
   },
   {
     "path": "fixtures/fetched/qpdf/c-r5-in.pdf",
@@ -463,6 +445,24 @@
     "purpose": "AES-256 R6 with user password; owner master",
     "committed": false,
     "cipher": "AES-256"
+  },
+  {
+    "path": "fixtures/fetched/qpdf/V4-aes.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "1d8a812844b8d8c7ba085a627eb3b7ab52aa651c6143ca07315084220a113240",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "AES-128 (V4/R4) with empty user and owner passwords",
+    "committed": false,
+    "cipher": "AES-128"
   },
   {
     "path": "fixtures/vendored/generated/acroform-all-aes256.pdf",
@@ -622,6 +622,34 @@
         "x": 500,
         "y": 700
       }
+    ]
+  },
+  {
+    "path": "fixtures/vendored/generated/hostile-actions.pdf",
+    "source": "generated",
+    "license": "GPL-3.0-or-later",
+    "sha256": "2da6faa813fb7e6fa6b5fe6619a6a574d95a033d8e3bab2dd73d8a769197db48",
+    "committed": true,
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "Hostile active content: OpenAction JavaScript and Launch, document JavaScript, additional actions, a Launch link, a javascript: URI link, SubmitForm, a field named __proto__ (spec §11.4)",
+    "fieldKinds": [
+      "text",
+      "button"
+    ],
+    "features": [
+      "javascript",
+      "launch",
+      "link",
+      "submit-form",
+      "proto-field-name"
     ]
   },
   {
