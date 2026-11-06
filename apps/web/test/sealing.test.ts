@@ -182,7 +182,7 @@ describe('the session controller with sealed edits', () => {
   it('stores the edits of a password-protected document only in sealed form', async () => {
     make();
     await open('e', true, 'bogey');
-    expect(useDocumentStore.getState().sealingKey).not.toBeNull();
+    await vi.waitFor(() => expect(useDocumentStore.getState().sealingKey).not.toBeNull());
     useEditsStore.getState().load(EDITS);
     await controller.flush();
     await settle();
@@ -212,7 +212,7 @@ describe('the session controller with sealed edits', () => {
     await settle();
 
     await open('e', true, 'bogey', saved);
-    expect(useEditsStore.getState().present).toEqual(EDITS);
+    await vi.waitFor(() => expect(useEditsStore.getState().present).toEqual(EDITS));
     expect(useSessionStore.getState().notice).toBeNull();
   });
 
@@ -236,7 +236,7 @@ describe('the session controller with sealed edits', () => {
     });
     expect(useDocumentStore.getState().status).toBe('ready');
     expect(useEditsStore.getState().present).toEqual({ fieldValues: {}, overlays: [] });
-    expect(useSessionStore.getState().notice).toBe('edits-unreadable');
+    await vi.waitFor(() => expect(useSessionStore.getState().notice).toBe('edits-unreadable'));
   });
 
   it('fails closed when the IV was changed', async () => {
@@ -246,7 +246,7 @@ describe('the session controller with sealed edits', () => {
       ...saved,
       sealed: { ...saved.sealed!, iv: flip(saved.sealed!.iv) },
     });
-    expect(useSessionStore.getState().notice).toBe('edits-unreadable');
+    await vi.waitFor(() => expect(useSessionStore.getState().notice).toBe('edits-unreadable'));
   });
 
   it('refuses a sealed blob moved onto another record', async () => {
@@ -254,7 +254,7 @@ describe('the session controller with sealed edits', () => {
     const donor = await savedSealed('a');
     await open('b', true, 'bogey', { ...donor, id: 'b', name: 'b.pdf' });
     expect(useEditsStore.getState().present.fieldValues).toEqual({});
-    expect(useSessionStore.getState().notice).toBe('edits-unreadable');
+    await vi.waitFor(() => expect(useSessionStore.getState().notice).toBe('edits-unreadable'));
   });
 
   it('never uses plaintext edits on a password-protected record', async () => {
@@ -273,7 +273,7 @@ describe('the session controller with sealed edits', () => {
     make(() => Promise.reject(new Error('no crypto')));
     const saved = await savedSealed('e');
     await open('e', true, 'bogey', saved);
-    expect(useSessionStore.getState().notice).toBe('edits-unreadable');
+    await vi.waitFor(() => expect(useSessionStore.getState().notice).toBe('edits-unreadable'));
     useEditsStore.getState().load(EDITS);
     await controller.flush();
     await settle();
