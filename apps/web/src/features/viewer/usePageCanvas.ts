@@ -22,9 +22,25 @@ export function usePageCanvas(
   annotations: AnnotationRendering,
   priority: number,
   canvasClass: string,
+  maxPixels: number = LIMITS.maxCanvasPixels,
 ): PageCanvasStatus {
-  // The status belongs to one render; a newer render reads as 'rendering' until it settles.
-  const renderKey = page && zoom !== null ? `${page.index}@${zoom}/${annotations}` : null;
+  const pixels =
+    page && zoom !== null
+      ? canvasSize(
+          page.size.width * zoom,
+          page.size.height * zoom,
+          window.devicePixelRatio,
+          maxPixels,
+        )
+      : null;
+  const pixelWidth = pixels?.width ?? 0;
+  const pixelHeight = pixels?.height ?? 0;
+  // The status belongs to one render; a newer render reads as 'rendering' until it settles. A
+  // neighbor that becomes current re-renders only if its canvas was capped smaller (V6).
+  const renderKey =
+    page && zoom !== null
+      ? `${page.index}@${zoom}/${annotations}/${pixelWidth}x${pixelHeight}`
+      : null;
   const [settled, setSettled] = useState<{ key: string; status: 'ready' | 'failed' } | null>(null);
   // A neighbor that becomes the current page keeps its render; only new renders take the priority.
   const currentPriority = useEffectEvent(() => priority);
@@ -32,12 +48,6 @@ export function usePageCanvas(
   useEffect(() => {
     const target = host.current;
     if (!target || !page || zoom === null || renderKey === null) return;
-    const pixels = canvasSize(
-      page.size.width * zoom,
-      page.size.height * zoom,
-      window.devicePixelRatio,
-      LIMITS.maxCanvasPixels,
-    );
     const canvas = document.createElement('canvas');
     canvas.className = canvasClass;
     canvas.setAttribute('aria-hidden', 'true');
@@ -45,8 +55,8 @@ export function usePageCanvas(
       () =>
         page.render(canvas, {
           zoom,
-          pixelWidth: pixels.width,
-          pixelHeight: pixels.height,
+          pixelWidth,
+          pixelHeight,
           annotations,
         }),
       currentPriority(),
@@ -70,7 +80,7 @@ export function usePageCanvas(
       live = false;
       job.cancel();
     };
-  }, [host, page, zoom, annotations, canvasClass, renderKey]);
+  }, [host, page, zoom, annotations, canvasClass, renderKey, pixelWidth, pixelHeight]);
 
   useEffect(() => {
     const target = host.current;
