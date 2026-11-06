@@ -71,7 +71,7 @@ E2E runs against the production build via `vite preview`. Ports come from `scrip
   - App limits live in `src/config.ts`; problem codes and their user text in `src/ui/messages.ts`.
 - The pdf-lib fork deletes a document's XFA whenever `getForm()` runs (saving included) unless loaded with `preserveXFA: true`.
 - Browser-mode tests: list every package they import in `vitest.config.ts` (`CORE_BROWSER_DEPS` / `WEB_BROWSER_DEPS`), or Vite re-optimizes mid-run on a cold cache and the post-merge gate fails. Tests under the E2E violation fixture take no screenshots (WebKit reports Playwright's injected style).
-- WebKit reports a `style-src-attr` violation whenever a native `<select>` is created; see spec §16.4 before using one.
+- Native controls are preferred. WebKit reports a `style-src-attr` violation for its own `<select>` internals; the E2E fixture ignores exactly that report (spec §16.4), so use `<select>` freely, and never set inline style attributes (React `style` props go through the CSSOM and are fine).
 - Coordinates: overlays store an anchor in unrotated PDF points and dimensions in the upright (as-viewed) frame; export draws with `rotate = page /Rotate` (spec §5.3).
 
 ## Security constraints

@@ -821,9 +821,9 @@ All six were confirmed by the maintainer on 2026-11-06.
 6. Hybrid XFA: inspection treats placed widgets without appearance streams as usable (the two pdfium static-XFA fixtures), and export generates the missing appearances. The fixture manifest labels hybrid files `formType: 'xfa'` with `xfa: 'hybrid'`; `inspectPdf` returns `acroform` for them as §6.2 says.
 7. pdf-lib logs "Failed to extract appearance ref" while flattening unchecked checkboxes that have only an on-state appearance (the IRS forms). Nothing is lost, since the page draws the empty box; checked boxes flatten correctly (verified on the W-9's "Other" and 3b boxes).
 
-### 16.4 Open decisions
+### 16.4 Decisions after wave 1
 
-1. **Native `<select>` in WebKit.** WebKit reports a `style-src-attr` violation for its own shadow tree whenever a `<select>` is created, which fails the E2E violation fixture. Sprint 1's zoom menu uses a menu button. Sprint 5's dropdown and list fields (§7.1) need either a narrow exception in the fixture for this one WebKit report (recommended: keeps the iPad's native picker and built-in accessibility, with no change to the real policy) or custom controls.
+1. **Native `<select>` stays** (decided 2026-11-06). WebKit reports a `style-src-attr` violation from its own shadow tree whenever a `<select>` is created. It is a false positive for Bogey, and native controls give the iPad its system picker and built-in accessibility, so the E2E violation fixture ignores exactly that report: WebKit only, `style-src-attr`, blocked URI `inline`, event target `SELECT`. A self-test proves an inline style the page sets on any other element still fails in every engine. The real security policy is unchanged. Dropdown and list fields use `<select>` as §7.1 says.
 
 ### 16.5 Assumptions
 
