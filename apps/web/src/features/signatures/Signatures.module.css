@@ -1,0 +1,192 @@
+/* Signature capture and library (spec §8). */
+
+/* The draw and upload dialogs need more room than the default dialog width (spec §8.1: at least
+   600 CSS px of canvas, up to 900). */
+dialog:has(.wide) {
+  width: min(calc(900px + 2 * var(--space-5) + 2px), calc(100vw - 2rem));
+  max-width: none;
+}
+
+.wide {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.pad {
+  display: block;
+  width: 100%;
+  max-width: 900px;
+  aspect-ratio: 3;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  /* Paper-white in both color schemes, so the ink reads as it will on the page. */
+  background: #fff;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: crosshair;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--failure-text);
+  background: var(--failure-soft);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-4);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.input {
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.kind {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-sm);
+}
+
+.kind legend {
+  float: left;
+  margin-right: var(--space-2);
+  padding: 0;
+}
+
+.kind label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.actions .push {
+  margin-right: auto;
+}
+
+/* Upload preview: a checkerboard behind the image shows which parts became transparent. */
+.preview {
+  display: block;
+  max-width: 100%;
+  max-height: 40vh;
+  margin: 0 auto;
+  border: 1px solid var(--border-strong);
+  background-color: #fff;
+  background-image: conic-gradient(#d4d4d4 25%, #fff 0 50%, #d4d4d4 0 75%, #fff 0);
+  background-size: 16px 16px;
+}
+
+.slider {
+  width: 100%;
+}
+
+/* The library panel. */
+.panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.place {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.place[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.thumb {
+  display: block;
+  max-width: 100%;
+  height: 3rem;
+  object-fit: contain;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  /* Dark ink on a white tile, so thumbnails stay legible in dark mode. */
+  background: #fff;
+}
+
+.itemActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
