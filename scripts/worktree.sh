@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Worktrees for concurrent sprints (implementation plan §1.1, §4).
 #
-#   scripts/worktree.sh start sprint/NN-name    branch from master into ../bogey-worktrees/
+#   scripts/worktree.sh start sprint/NN-name [base]   branch from master (or base) into ../bogey-worktrees/
 #   scripts/worktree.sh finish sprint/NN-name   remove the worktree (the branch is kept)
 #   scripts/worktree.sh list
 #
@@ -14,6 +14,7 @@ main="$(dirname "$main")"
 root="$(dirname "$main")/bogey-worktrees"
 command="${1:-}"
 branch="${2:-}"
+base="${3:-master}"
 path="$root/${branch//\//-}"
 
 case "$command" in
@@ -23,7 +24,7 @@ case "$command" in
     if git show-ref --verify --quiet "refs/heads/$branch"; then
       git -C "$main" worktree add "$path" "$branch"
     else
-      git -C "$main" worktree add -b "$branch" "$path" master
+      git -C "$main" worktree add -b "$branch" "$path" "$base"
     fi
     (cd "$path" && pnpm install --frozen-lockfile)
     base="$(cd "$path" && node -e "import('./scripts/ports.mjs').then(m => console.log(JSON.stringify(m.ports())))")"
