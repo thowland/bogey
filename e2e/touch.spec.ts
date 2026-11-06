@@ -17,7 +17,9 @@ import {
   zoomLabel,
 } from './helpers.ts';
 
-const { defaultBrowserType: _webkit, ...iPad } = devices['iPad Pro 11'];
+// Everything but the browser type, which a describe block cannot set.
+const { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } = devices['iPad Pro 11'];
+const iPad = { viewport, userAgent, deviceScaleFactor, isMobile, hasTouch };
 
 /** The zoom the app shows, from the zoom menu button (for example 150). */
 async function zoomPercent(page: Page): Promise<number> {

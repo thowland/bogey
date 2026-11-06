@@ -51,7 +51,7 @@ afterEach(() => {
 });
 
 describe('two-finger pinch (browsers without gesture events)', () => {
-  beforeEach(() => {
+  it('is the path where there are no gesture events (jsdom has none)', () => {
     expect(hasGestureEvents()).toBe(false);
   });
 
@@ -149,7 +149,7 @@ describe('two-finger pinch (browsers without gesture events)', () => {
 
 describe('WebKit gesture events (Safari on iPad and macOS)', () => {
   beforeEach(() => {
-    vi.stubGlobal('GestureEvent', class {});
+    vi.stubGlobal('GestureEvent', Event);
   });
 
   it('are cancelled everywhere, and zoom only when they start on the page', async () => {
