@@ -55,12 +55,12 @@ The first release deployed to https://bogey.beta-site.us, built over sprints 0 t
 
 ### Acceptance
 
-| Test | Automated (Chromium, Firefox, WebKit) | Mac | iPad |
-| --- | --- | --- | --- |
-| 1. Password-protected form, every field, Pencil signature | Pass, all three | | |
-| 2. Flat scanned page within 1 pt | Pass, all three | | |
-| 3. Close mid-edit and restore | Pass, all three | | |
-| 4. No requests after the shell loads; offline | Pass, all three | | |
-| 5. Second form under a minute | Pass, all three | | |
+| Test                                                      | Automated (Chromium, Firefox, WebKit) | Mac | iPad |
+| --------------------------------------------------------- | ------------------------------------- | --- | ---- |
+| 1. Password-protected form, every field, Pencil signature | Pass, all three                       |     |      |
+| 2. Flat scanned page within 1 pt                          | Pass, all three                       |     |      |
+| 3. Close mid-edit and restore                             | Pass, all three                       |     |      |
+| 4. No requests after the shell loads; offline             | Pass, all three                       |     |      |
+| 5. Second form under a minute                             | Pass, all three                       |     |      |
 
 Mac and iPad results, with dates and browser versions, are added from `docs/manual-acceptance.md`.
