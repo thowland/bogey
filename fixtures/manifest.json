@@ -1,5 +1,470 @@
 [
   {
+    "path": "fixtures/fetched/ircc/imm5257_1e.pdf",
+    "source": "ircc",
+    "license": "Crown copyright (fetched, not redistributed)",
+    "sha256": "12486ea3d55d7cfa7ab88a915389c506dd76204b453d04c26cec0bf9ded75f93",
+    "formType": "xfa",
+    "xfa": "dynamic",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "production dynamic XFA (IMM 5257 Schedule 1), AES-128 with owner password only",
+    "committed": false,
+    "cipher": "AES-128"
+  },
+  {
+    "path": "fixtures/fetched/ircc/imm5257e.pdf",
+    "source": "ircc",
+    "license": "Crown copyright (fetched, not redistributed)",
+    "sha256": "0dc03b24e7914a178ad29e2cfae811045835a1d36d7a3c35f040251d0aca562e",
+    "formType": "xfa",
+    "xfa": "dynamic",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "production dynamic XFA (IMM 5257), AES-128 with owner password only",
+    "committed": false,
+    "cipher": "AES-128"
+  },
+  {
+    "path": "fixtures/fetched/irs/f1040.pdf",
+    "source": "irs",
+    "license": "Public domain (US government work)",
+    "sha256": "3d31c226df0d189ced80e039d01cf0f8820c1019681a0f0ca6264de277b7e982",
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 2,
+    "purpose": "IRS 1040: many text/checkbox fields, comb fields; static XFA alongside AcroForm",
+    "committed": false,
+    "features": [
+      "comb"
+    ]
+  },
+  {
+    "path": "fixtures/fetched/irs/fw4.pdf",
+    "source": "irs",
+    "license": "Public domain (US government work)",
+    "sha256": "92444d8856ce55d9e25dca8b6d1420634fc68b11e1ab1f760916ea29ddd312b2",
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 5,
+    "purpose": "IRS W-4: text and checkboxes; static XFA alongside AcroForm",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/irs/fw9.pdf",
+    "source": "irs",
+    "license": "Public domain (US government work)",
+    "sha256": "2d420cbb4123dcf1fb82595b2359cfbb5d81f00b9df9d359fcc7af361d093f53",
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 6,
+    "purpose": "IRS W-9: comb and max-length fields, checkboxes; static XFA alongside AcroForm",
+    "committed": false,
+    "features": [
+      "comb",
+      "max-length"
+    ]
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/annotation-choice-widget.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "2fcab2aed82afe9775359c1d166fb7aae77e99d25fe03be177e233d02d572538",
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "combo, list and multi-select list widgets in a hybrid XFA form",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/bug2082236.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "3509af52c656c04ff98bac223646252b78cfb96fa0c2626ac3f74f907224f4aa",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      270
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "page at /Rotate 270",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/checkbox_no_appearance.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "31e82e933f4d4664c6ae1c4418cc44efce0c614c10c85c34b515b38e04e08bcd",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "checkboxes without appearance streams",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/crypt_filters.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "19e6370432a3f4edb77900afb3e8d8d6a71344fe0912854781c391a506668d0a",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "mixed crypt filters (V4), empty user password, text field",
+    "committed": false,
+    "cipher": "AES-128"
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/empty_protected.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "69556af04215faec7da3e93e823c64f1b74679e52fd10379176f0e0462dd4b6c",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "AES-256 R6 owner password only",
+    "committed": false,
+    "cipher": "AES-256"
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/issue14415.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "5487757b406d8970203818c8008969f868e23955650a81b193d0bbd2e6b99b60",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      180
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "page at /Rotate 180",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/issue15893_reduced.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "3c2815853e6fe5c34feb76bb14402cbc46bbd484ecd57b672fc03577d0458ee8",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "test",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "RC4 128-bit with user password",
+    "committed": false,
+    "cipher": "RC4-128"
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/issue16278.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "89da5db038b028242684ed2fa5044e7f0ce6527717cb794fbca043a99bae9146",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      90
+    ],
+    "cropOrigin": true,
+    "pageCount": 1,
+    "purpose": "non-zero crop box origin combined with /Rotate 90",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/issue21579.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "3b3d1db2aa4797e63d6dc7e48dc4f327c468144b93f80301771940230651da2e",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "p\u00e4ssw\u00f6rt",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "AES-256 R5 with non-ASCII user password",
+    "committed": false,
+    "cipher": "AES-256"
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/issue3371.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "0c3fb45d9b61ea762b4b3298c8c47e5375e83d151d356d87d740bcb85d953473",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "ELXRTQWS",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "AES-128 with user password",
+    "committed": false,
+    "cipher": "AES-128"
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/issue6010_1.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "d7fd95e016b7d43bc9eed1041b0cdd6ee00e3dd902e50d0307b0a428782c543c",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "abc",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "AES-256 R6 with user password",
+    "committed": false,
+    "cipher": "AES-256"
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/multiline.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "a320198cf4bf28eaeb99080afcd92e5c2f864af1620b1b394a7bea44fb01c93c",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": true,
+    "pageCount": 1,
+    "purpose": "multiline text field on a page with non-zero crop box origin",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/rotation.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "5087c2afe763d145537d652bb3bc6c321ace3a267b2679ae2c178add3ba7f1d9",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0,
+      90
+    ],
+    "cropOrigin": false,
+    "pageCount": 2,
+    "purpose": "two pages, /Rotate 0 and 90",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/pdfjs/textfields.pdf",
+    "source": "pdfjs",
+    "license": "Apache-2.0 (repository; fetched, not redistributed)",
+    "sha256": "f05e613732fbd3013578322e84a83925e98ffe522d2868a1f41485deb5855788",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "text fields in single-line, multiline and comb variants",
+    "committed": false
+  },
+  {
+    "path": "fixtures/fetched/qpdf/V4-aes.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "1d8a812844b8d8c7ba085a627eb3b7ab52aa651c6143ca07315084220a113240",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "AES-128 (V4/R4) with empty user and owner passwords",
+    "committed": false,
+    "cipher": "AES-128"
+  },
+  {
+    "path": "fixtures/fetched/qpdf/c-r5-in.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "19b6a33008141e1e898e1fac6e86524de0e8cd0c4643fdb01a1eb781e5cd8187",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "user3",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "AES-256 R5 (deprecated Adobe extension 3) with user password",
+    "committed": false,
+    "cipher": "AES-256"
+  },
+  {
+    "path": "fixtures/fetched/qpdf/enc-R2,V1,U=view,O=master.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "cbd0396c5af37a326cc829b3a031223accf5ea093119eaaa78bf4a386108ed14",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "view",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "RC4 40-bit (R2) with user password; owner master",
+    "committed": false,
+    "cipher": "RC4-40"
+  },
+  {
+    "path": "fixtures/fetched/qpdf/enc-R3,V2,O=master.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "d0e64612cf946dd19e7421fa3ee17b466b54c8f164b1f95986f14d8ee8e02ba9",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "RC4 128-bit (R3) owner password only (master)",
+    "committed": false,
+    "cipher": "RC4-128"
+  },
+  {
+    "path": "fixtures/fetched/qpdf/enc-R3,V2,U=view,O=master.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "5c0683d687e2e020fe172b1dcb7c29fe94f67bc40f038fee2391de610053fc16",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "view",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "RC4 128-bit (R3) with user password; owner master",
+    "committed": false,
+    "cipher": "RC4-128"
+  },
+  {
+    "path": "fixtures/fetched/qpdf/enc-XI-R6,V5,O=master.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "63c99503fc9c6b44c47df124ce040d005e26d2c5d8d0999ad59c48b31a426863",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "AES-256 R6 owner password only (master)",
+    "committed": false,
+    "cipher": "AES-256"
+  },
+  {
+    "path": "fixtures/fetched/qpdf/enc-XI-R6,V5,U=view,O=master.pdf",
+    "source": "qpdf",
+    "license": "Apache-2.0",
+    "sha256": "96b9262bfacf1358c7a68ab46c11563677e858888950237fdac8f3a227210edf",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "view",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 30,
+    "purpose": "AES-256 R6 with user password; owner master",
+    "committed": false,
+    "cipher": "AES-256"
+  },
+  {
     "path": "fixtures/vendored/generated/acroform-all-aes256.pdf",
     "source": "generated",
     "license": "GPL-3.0-or-later",
@@ -436,5 +901,322 @@
       "list",
       "button"
     ]
+  },
+  {
+    "path": "fixtures/vendored/pdf-lib/fancy_fields.pdf",
+    "source": "pdf-lib",
+    "license": "MIT",
+    "sha256": "442669e40c4e2949e2f070c9714674988d01d8be070bd2d1d4c7e5bca16d9cfd",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "AcroForm with every field type, all with appearance streams",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdf-lib/form_to_flatten.pdf",
+    "source": "pdf-lib",
+    "license": "MIT",
+    "sha256": "fa71bff33bd6963e0e11b5fd37cf48b108a82c85cb2362ced60ea3548e8f0a40",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "AcroForm used by pdf-lib flatten tests: text, check, radio, dropdown, list",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdf-lib/sample_form.pdf",
+    "source": "pdf-lib",
+    "license": "MIT",
+    "sha256": "98a889d7640f8dbbd6b4a849436f1c64e80d5a8ef0a47d1388c2782f93d84a8a",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "AcroForm with text, checkbox, radio, push button and signature field",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdf-lib/with_combed_fields.pdf",
+    "source": "pdf-lib",
+    "license": "MIT",
+    "sha256": "7850848531306d2897940a5a345973b6b3eac6fd52457c37187a9be0994d0824",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 13,
+    "purpose": "13-page AcroForm with comb text fields and many widgets",
+    "committed": true,
+    "features": [
+      "comb",
+      "max-length"
+    ]
+  },
+  {
+    "path": "fixtures/vendored/pdf-lib/with_cropbox.pdf",
+    "source": "pdf-lib",
+    "license": "MIT",
+    "sha256": "7e9f4cea69091a52c05b1567d1aa4b197f83b498ba483207ee556f95dc03dc54",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 2,
+    "purpose": "explicit CropBox equal to MediaBox (pdf-lib cropbox case)",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdf-lib/with_xfa_fields.pdf",
+    "source": "pdf-lib",
+    "license": "MIT",
+    "sha256": "c0ce611fedd25b47b78ef8bc10a4f91c4382030f32f420e7f819f778bfb57ec1",
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 2,
+    "purpose": "hybrid XFA+AcroForm (pdf-lib XFA-flagged case)",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdfium/listbox_form.pdf",
+    "source": "pdfium",
+    "license": "BSD-3-Clause",
+    "sha256": "4dd3b8b958eb56cb49afbb6b60b14b6d6ecba788181e088aa68be459fed10b49",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "minimal AcroForm list boxes, single and multi-select",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdfium/multiple_form_types.pdf",
+    "source": "pdfium",
+    "license": "BSD-3-Clause",
+    "sha256": "cdff8afa99ed38cf602f13877d5be8d5aa4c9ed56b85e799349fece2bfeda129",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "minimal AcroForm: text, checkbox, radio, editable combo, multi-select list",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdfium/simple_xfa.pdf",
+    "source": "pdfium",
+    "license": "BSD-3-Clause",
+    "sha256": "82e0af732b472b023b3c50940cac0d76b6a84c25dab2b4a8de79fd0a6b7cdb89",
+    "formType": "xfa",
+    "xfa": "dynamic",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "minimal dynamic XFA (NeedsRendering, no widgets)",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdfium/static_list_box_caption.pdf",
+    "source": "pdfium",
+    "license": "BSD-3-Clause",
+    "sha256": "9b59127cc8a96009462cc5f771d78c1c32a74ff17866409ecb8865d77a676617",
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "static XFA with AcroForm list box widgets (no appearance streams)",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdfium/static_password_field_rotate.pdf",
+    "source": "pdfium",
+    "license": "BSD-3-Clause",
+    "sha256": "464aa3780a3db1e001ead9fd14be46fd1a470bbfe4daf41f4e51ee6278ee13e3",
+    "formType": "xfa",
+    "xfa": "hybrid",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 2,
+    "purpose": "static XFA with rotated password text widgets (no appearance streams)",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pdfium/xfa_combobox.pdf",
+    "source": "pdfium",
+    "license": "BSD-3-Clause",
+    "sha256": "0ee96bdeb2dad02e3afbfc9b79960c89f63c5316732d913e6677fe3ffe9a92d9",
+    "formType": "xfa",
+    "xfa": "dynamic",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "dynamic XFA with a combo box field",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pypdf/cropped-rotated-scaled.pdf",
+    "source": "pypdf",
+    "license": "CC-BY-SA-4.0",
+    "sha256": "cc195eac510b81123de4f55ac9f8185f2120975a7b75a106460b98615737aacd",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0,
+      90,
+      180,
+      270
+    ],
+    "cropOrigin": true,
+    "pageCount": 4,
+    "purpose": "offset MediaBox and CropBox at every rotation, with annotations and orphan widgets (no AcroForm dict)",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pypdf/habibi-rotated.pdf",
+    "source": "pypdf",
+    "license": "CC-BY-SA-4.0",
+    "sha256": "56329f1e3cff5358f1f2aadcfac03467cce51b36b2e2daab9c14cef26f7ea536",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0,
+      90,
+      180,
+      270
+    ],
+    "cropOrigin": false,
+    "pageCount": 4,
+    "purpose": "flat pages at /Rotate 0, 90, 180, 270",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pypdf/libreoffice-form.pdf",
+    "source": "pypdf",
+    "license": "CC-BY-SA-4.0",
+    "sha256": "9105eeef8c8cafdb141b7edd768a5e08adffe320d1d4f89e1a7112a2b37d1c57",
+    "formType": "acroform",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "LibreOffice AcroForm: text, multiline, checkbox, radio, dropdown",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pypdf/libreoffice-writer-password.pdf",
+    "source": "pypdf",
+    "license": "CC-BY-SA-4.0",
+    "sha256": "3e333bff0196d0c5320f40cdd1b7a3abd21b316de79de3c0f9083accdaef9358",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": true,
+    "password": "openpassword",
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "RC4 128-bit with user password (owner: permissionpassword)",
+    "committed": true,
+    "cipher": "RC4-128"
+  },
+  {
+    "path": "fixtures/vendored/pypdf/minimal-document.pdf",
+    "source": "pypdf",
+    "license": "CC-BY-SA-4.0",
+    "sha256": "f723638db6e763cf4ccadad38a3d38a02d9ecab95dab1f0bbf00e801991b5f92",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 1,
+    "purpose": "flat single page, minimal",
+    "committed": true
+  },
+  {
+    "path": "fixtures/vendored/pypdf/pdflatex-4-pages.pdf",
+    "source": "pypdf",
+    "license": "CC-BY-SA-4.0",
+    "sha256": "f17a09190ad8a04964d78115d8ba7fc7a298557274fa14932ba58612342b7dec",
+    "formType": "flat",
+    "xfa": "none",
+    "encrypted": false,
+    "password": null,
+    "rotation": [
+      0
+    ],
+    "cropOrigin": false,
+    "pageCount": 4,
+    "purpose": "flat multi-page text document",
+    "committed": true
   }
 ]
