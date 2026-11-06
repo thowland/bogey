@@ -37,3 +37,26 @@ test('the page refuses to be framed (spec §11.3)', async ({ browser, baseURL })
   expect(text).not.toContain('Bogey');
   await attacker.close();
 });
+
+// Native <select> stays (spec §16.4): WebKit's report about its own control is ignored, and nothing
+// else is. The second test proves a style attribute the page sets is still caught in every engine.
+test('a native select raises no violation @all-engines', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const select = document.createElement('select');
+    select.append(new Option('One'), new Option('Two'));
+    document.body.append(select);
+  });
+  await expect(page.getByRole('combobox')).toBeVisible();
+});
+
+test('a style attribute set by the page is still caught @all-engines', async ({ page }) => {
+  test.fail();
+  await page.goto('/');
+  await page.evaluate(() => {
+    const div = document.createElement('div');
+    div.setAttribute('style', 'color: red');
+    document.body.append(div);
+  });
+  await page.waitForTimeout(300);
+});

@@ -12,17 +12,37 @@ export function fixture(path: string): Buffer {
 }
 
 /**
+ * WebKit's own shadow tree for a native <select> reports a `style-src-attr` violation whenever
+ * the element is created, targeted at the SELECT element. Nothing in the page caused it and the
+ * control works, so that one report is ignored, in WebKit only (spec §16.4; native controls were
+ * chosen on 2026-11-06). WebKit's accompanying console line carries no detail, so it is ignored
+ * in WebKit too; the event still records every real violation. A style attribute the page sets on
+ * any other element is still caught, which the self-test in security.spec.ts proves. Setting an
+ * inline style on a <select> itself would slip through, which Bogey never does: React styles
+ * through the CSSOM, and HTML sinks are banned by lint and Trusted Types.
+ */
+export function isWebKitSelectArtifact(browserName: string, report: string): boolean {
+  if (browserName !== 'webkit') return false;
+  return (
+    report === '[securitypolicyviolation] style-src-attr inline  target=SELECT' ||
+    /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive/.test(
+      report,
+    )
+  );
+}
+
+/**
  * Every test fails on a CSP or Trusted Types violation or an uncaught page error (spec §11.3).
  * Violations are collected both from `securitypolicyviolation` events and from console reports.
  */
 export const test = base.extend<{ violations: string[] }>({
   violations: [
-    async ({ page }, use) => {
+    async ({ page, browserName }, use) => {
       const violations: string[] = [];
       await page.addInitScript(() => {
         document.addEventListener('securitypolicyviolation', (event) => {
           console.error(
-            `[securitypolicyviolation] ${event.violatedDirective} ${event.blockedURI} ${event.sample}`,
+            `[securitypolicyviolation] ${event.violatedDirective} ${event.blockedURI} ${event.sample} target=${(event.target as Element | null)?.nodeName ?? ''}`,
           );
         });
       });
@@ -32,7 +52,8 @@ export const test = base.extend<{ violations: string[] }>({
           message.type() === 'error' &&
           /securitypolicyviolation|Content Security Policy|Trusted ?Type|TrustedScript|TrustedHTML/i.test(
             text,
-          )
+          ) &&
+          !isWebKitSelectArtifact(browserName, text)
         ) {
           violations.push(text);
         }
