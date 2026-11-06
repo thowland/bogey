@@ -1,6 +1,6 @@
 # Bogey – Technical Specification
 
-Status: Draft 1 · 2026-11-06
+Status: Draft 2 · 2026-11-06 (wave 1 findings folded in)
 Companion to: `docs/VISION.md` and `docs/REQUIREMENTS.md` (referred to below as "the vision" and "the requirements")
 
 This document describes how Bogey is built: the repository layout, the boundary between the pure document library and the web application, the geometry model, form handling, overlays, signatures, export, persistence, the service worker, security, testing and release. Requirement IDs (D1, F3, X5 and so on) refer to the requirements. Where the requirements leave a choice open, this document makes one; where it departs from the requirements, the departure is listed in §16 with its reason so it can be confirmed or reversed. Appendix A maps every requirement ID to the section that satisfies it.
@@ -134,9 +134,9 @@ export async function inspectPdf(bytes: Uint8Array, opts?: { password?: string }
 
 // ── Editing (§7) ──────────────────────────────────────────────
 export function createEditState(info: PdfInfo): DocumentEditState;
-export function applyEdit(state: DocumentEditState, edit: Edit): DocumentEditState;   // pure reducer
+export function applyEdit(state: DocumentEditState, edit: Edit, ctx: EditContext): DocumentEditState;   // pure; ctx = fields and page count, for validation
 export function createHistory(state: DocumentEditState, opts?: { limit?: number }): History;
-export function historyApply(h: History, edit: Edit, opts?: { coalesceKey?: string }): History;
+export function historyApply(h: History, edit: Edit, ctx: EditContext, opts?: { coalesceKey?: string }): History;
 export function undo(h: History): History;
 export function redo(h: History): History;
 
@@ -151,7 +151,8 @@ export function removeNearWhite(rgba: Uint8ClampedArray, w: number, h: number, t
 export function alphaBounds(rgba: Uint8ClampedArray, w: number, h: number, pad: number): Rect | null;
 
 // ── Export (§9) ───────────────────────────────────────────────
-export async function exportPdf(input: ExportInput): Promise<Result<ExportOutput, ExportProblem>>;
+export async function exportPdf(input: ExportInput, onStage?: (s: ExportStage) => void | Promise<void>): Promise<Result<ExportOutput, ExportProblem>>;
+export async function exportPageImages(input: ExportPageImagesInput): Promise<Result<ExportOutput, ExportProblem>>;   // §9.5; pages rendered by the app
 export function preflightExport(state: DocumentEditState, fields: FieldDescriptor[]): ExportWarning[];   // E4
 export function outputFileName(originalName: string): string;      // D8
 
@@ -370,7 +371,7 @@ On Save, the canvas pixels are read with `getImageData`, `alphaBounds(…, pad =
 
 ### 8.2 Uploading (G4, S9)
 
-Accepted inputs are whatever `createImageBitmap` decodes: PNG, JPEG, WebP everywhere and HEIC in Safari. Files over 20 MB are refused; the bitmap is decoded with `imageOrientation: 'from-image'` and, if its long edge exceeds 2,000 px, resized to 2,000 px during decode (`resizeWidth`/`resizeHeight`), which bounds memory and is still about 6× the resolution needed for a 150 pt signature at print quality.
+Accepted inputs are whatever `createImageBitmap` decodes: PNG, JPEG, WebP everywhere and HEIC in Safari. Files over 20 MB are refused; the bitmap is decoded with `imageOrientation: 'from-image'` and, if its long edge exceeds 2,000 px, drawn scaled to 2,000 px straight after decoding (the size is only known once decoded, so a resize during decode would need a second decode; peak memory is about the same), which bounds memory and is still about 6× the resolution needed for a 150 pt signature at print quality.
 
 `removeNearWhite` uses Rec. 709 luminance, `0.2126 R + 0.7152 G + 0.0722 B`. Pixels at or above the threshold become fully transparent; pixels within 16 levels below it get a proportional alpha, which removes the hard, jagged fringe that a single cut-off leaves around anti-aliased ink. The threshold slider covers 180–250 (default 235). The dialog previews the result on a checkerboard, updating on slider input with the work done on a downscaled copy for responsiveness and on the full image at Save. The result is trimmed with `alphaBounds` and stored as a new PNG; the uploaded file's bytes are discarded, which strips EXIF and any other metadata (S9).
 
@@ -393,7 +394,14 @@ Signatures are stored as `{ id, name, kind, png: ArrayBuffer, width, height, cre
    3. **Appearance check**: any field whose widgets lack an appearance stream for their current value (common in forms that set `/NeedAppearances true` and rely on the reader) is marked dirty, so that the next step generates one. Without this, `flatten()` drops those fields' visible content.
    4. `form.updateFieldAppearances(helvetica)`, then `form.flatten()`, then remove `/NeedAppearances`.
 3. **Overlays** (E3), after flattening so they sit above field content. Fonts (`Helvetica`, `Helvetica-Bold`, `ZapfDingbats`) are embedded on first use. Each signature PNG is embedded once per document with `embedPng` and reused for every placement (G6, E5). Text is drawn line by line at `y − i × 1.2 × size` in the upright frame (§5.3), rotated by the page rotation.
-4. **Active content**: document-level JavaScript (`/Names /JavaScript`), JavaScript `/OpenAction`, and catalog and page `/AA` additional actions are removed. After flattening, form calculation and validation scripts have no fields to act on, and the remaining scripts in typical forms ("this form must be opened in Adobe Reader", print-on-open, field resets) can only misbehave in the recipient's reader. This is not in the requirements (§16).
+4. **Active content** (`export/hygiene.ts`, hardened through five security-review rounds in Sprint 2). Policy:
+   - Every action, wherever it lives (`/OpenAction`, catalog and page `/AA`, annotation `/A` and `/AA`, the `/Outlines` tree), is kept only if it is `GoTo`, or `URI` whose decoded target is an absolute `http:`, `https:` or `mailto:` URL. Unsafe actions are spliced out of `/Next` chains so a safe remainder survives.
+   - `/OpenAction` keeps only `GoTo` or a destination array, never `URI`, and its final chain is re-checked strictly at the end; anything else removes it.
+   - All `/AA` entries and the `/Names /JavaScript` tree are removed.
+   - Annotations are kept only if passive (Text, Link, FreeText, Line, Square, Circle, Polygon, PolyLine, Highlight, Underline, Squiggly, StrikeOut, Stamp, Caret, Ink, Popup, FileAttachment with actions stripped, Widget); 3D, RichMedia, Screen, Movie, Sound and unknown subtypes are removed. Embedded files stay.
+   - Cleaning fails closed and is bounded: shared action objects are copied per policy rather than edited in place (memoized, budget of 10,000 copies), result lists are de-duplicated and capped at 256 entries (over the cap, the slot keeps nothing), and an outline over 64 levels or 100,000 items is removed whole.
+
+   After flattening, form calculation and validation scripts have no fields to act on, and the remaining scripts in typical forms ("this form must be opened in Adobe Reader", print-on-open, field resets) can only misbehave in the recipient's reader. This is not in the requirements (§16).
 5. **Metadata** (E8): title and author are kept; `Producer` is set to `Bogey`; `ModDate` is set to now. The XMP metadata stream, if present, is left alone except for the same fields where it can be updated in place.
 6. **Encryption** (E9): the output is saved without encryption. The export dialog states this before the user confirms ("The original was password-protected. The downloaded copy will not be.").
 7. Save with `{ useObjectStreams: true }` (E6).
@@ -417,9 +425,13 @@ The export dialog shows an indeterminate progress indicator once export has run 
 
 If the pdf-lib fork cannot load a document that pdf.js opened with the same password (an unusual cipher or a damaged security handler), the export falls back to the approach in the vision: each page is rendered by pdf.js at 200 dpi, embedded as a JPEG page image in a new document, and overlays and field values are drawn on top. The dialog says that the result is an image of each page, without selectable text, and asks before continuing.
 
-### 9.6 Sprint 0 decryption spike
+### 9.6 Decryption (Sprint 2 spike, now a standing test)
 
-Before Sprint 1 begins, a test loads every qpdf encryption fixture (RC4 40-bit, RC4 128-bit, AES-128, AES-256; user and owner-only passwords) and the generated AES fixture with `@cantoo/pdf-lib`, fills and flattens a field, saves, and checks the output with pdf.js text extraction. Any cipher that fails is routed to §9.5 by a capability check in `inspectPdf`, and the result is recorded in this document. If the fork fails broadly, the fallback decision is between a WASM build of qpdf for decryption and accepting §9.5 for all encrypted files; that decision would come back to the maintainer.
+`tooling/test/fixtures-decryption.test.ts` loads every encrypted fixture with `@cantoo/pdf-lib`, fills and flattens a field where there is one, exports, and checks the output with pdf-lib (no `/Encrypt` anywhere) and pdf.js text extraction. Full results are in `docs/spikes/S2-decryption.md`. Every cipher in the qpdf matrix passes: RC4-40, RC4-128, AES-128, AES-256 R5 and R6, with user and owner-only passwords. The one failure is pdf.js's `crypt_filters.pdf` (mixed crypt filters), which loads without error but decrypts to garbage; a capability check in `inspectPdf` (no remaining `/Crypt` filters, first three pages' content streams readable) marks such files `decryptable: false`, `exportPdf` returns `export.cannot-decrypt`, and the app uses `exportPageImages` (§9.5).
+
+Three fixes came out of the spike: export removes leftover cross-reference streams and unparsed objects that still name `/Encrypt`; non-ASCII AES-256 R5 passwords are retried as UTF-8 (the fork encodes them as Latin-1); and the "no pages, so damaged" check runs after decryption, since some files keep their page tree in an encrypted object stream.
+
+Open: if pdf.js accepts a password the fork rejects (no fixture does), core reports `pdf.password-wrong`. The open flow should treat "pdf.js accepted, core rejected" as `decryptable: false` and use page images (assigned to Sprint 6, which owns encrypted restore).
 
 ---
 
@@ -478,9 +490,10 @@ apps/web/src/
 
 ### 10.3 pdf.js integration
 
-- **Worker**: `GlobalWorkerOptions.workerPort = new Worker(new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url), { type: 'module' })`. Vite bundles the worker as a hashed same-origin asset (S5), and the Trusted Types policy admits exactly that URL pattern.
-- **`getDocument` options**: `data` (a copy), `password`, `isEvalSupported: false`, `enableXfa: false`, `standardFontDataUrl: '/pdfjs/standard_fonts/'`, `cMapUrl: '/pdfjs/cmaps/'`, `cMapPacked: true`, `wasmUrl: '/pdfjs/wasm/'` (in pdf.js versions that ship WASM image decoders), `useSystemFonts: false`, and `disableFontFace: false`. A Vite plugin copies those three directories out of `pdfjs-dist` into the build at `/pdfjs/`. `isEvalSupported: false` matters for security: CVE-2024-4367 let a crafted font run arbitrary JavaScript through pdf.js's font compiler when eval was enabled, and turning it off removes that whole path (pdf.js versions before 4.2.67 were affected).
-- **Annotation mode**: pages of `acroform` documents render with `AnnotationMode.ENABLE_FORMS`, which leaves form widgets out of the canvas, since Bogey draws its own controls there; other annotations (stamps, comments, existing signature appearances) still render. `flat` and `xfa` documents render with `AnnotationMode.ENABLE`. Sprint 2 confirms which widget kinds ENABLE_FORMS omits in the pinned version, and specifically that button and signature-field appearances stay visible.
+- **Worker**: one module worker, `new Worker(new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url), { type: 'module' })`, wrapped once in a long-lived `new PDFWorker({ port })` that every `getDocument` receives as `worker`. Setting `GlobalWorkerOptions.workerPort` instead makes `loadingTask.destroy()` destroy the shared worker, which cuts off the document on screen when another is closed or superseded. Vite bundles the worker as a hashed same-origin asset (S5), and the Trusted Types policy admits exactly that URL pattern. `disableWorkerRendering: true` keeps pdf.js 6 from starting a second rendering worker.
+- **`getDocument` options**: `data` (a copy), `password`, `enableXfa: false`, `standardFontDataUrl: '/pdfjs/standard_fonts/'`, `cMapUrl: '/pdfjs/cmaps/'`, `cMapPacked: true`, `wasmUrl: '/pdfjs/wasm/'`, `iccUrl: '/pdfjs/iccs/'`, `useSystemFonts: false`, and `disableFontFace: false`. A Vite plugin (`apps/web/plugins/pdfjsAssets.ts`) copies those four directories out of `pdfjs-dist` into the build at `/pdfjs/`, leaving out the QuickJS scripting sandbox. pdfjs-dist 6.5.438 has no `isEvalSupported` option: the font-compiling `new Function` path behind CVE-2024-4367 (arbitrary JavaScript from a crafted font, pdf.js before 4.2.67) was removed upstream, and neither build file contains `eval` or `new Function`.
+- **WebAssembly**: pdf.js 6.5.438 compiles WebAssembly for JPEG 2000, JBIG2, ICC colour conversion and PostScript (Type 4) functions, so `'wasm-unsafe-eval'` stays in the CSP. Without it every engine refuses the modules and pdf.js falls back to much larger, slower JavaScript decoders (Sprint 1 spike, `docs/spikes/S1-pdfjs.md`).
+- **Annotation mode**: pages of `acroform` documents render with `AnnotationMode.ENABLE_FORMS` **and an `annotationCanvasMap`**; without the map, pdf.js paints checkboxes and radio buttons with both their on and off appearances on top of each other. With the map, text (including read-only), checkbox, radio, dropdown and list widgets are left out of the canvas, signature fields stay, and push buttons are also left out, so the loader copies each push button's own canvas back onto the page at its rectangle. Bogey's field layer therefore draws every value, read-only ones included (F8). Other annotations (stamps, comments) still render. `flat` and `xfa` documents render with `AnnotationMode.ENABLE`.
 - **Render scale**: `k × devicePixelRatio`, capped so that one canvas never exceeds 16,777,216 pixels (iOS Safari's per-canvas limit). Above the cap, the canvas renders at the cap and CSS scales it up, which looks slightly soft at very high zoom on large pages and is better than a blank canvas.
 - **Render queue**: at most two concurrent page renders; a render that is no longer needed is cancelled with `renderTask.cancel()`. During a zoom change the existing canvas is scaled with a CSS transform until the new render completes.
 - **Memory** (V6): the current page and its two neighbors have full canvases; other pages hold no canvas. Released canvases are set to 0 × 0 before being dropped, since WebKit frees backing stores reliably only that way. `page.cleanup()` runs for pages more than five away.
@@ -562,7 +575,7 @@ Bogey is a public site with no access control and no server-side data. Its secur
 | --- | --- | --- | --- |
 | T1 | Session injection by link | `bogey…/?open=https://evil/form.pdf` preloads a document the user then signs | No URL-driven state (§11.2) |
 | T2 | Cross-window injection | An attacker page frames Bogey or uses `postMessage` to feed it a file or click through a signing | No `message` listeners on `window`; `frame-ancestors 'none'`; COOP `same-origin` |
-| T3 | Hostile PDF | Exploit in a parser, font-compiler JavaScript (CVE-2024-4367), decompression bomb, PDF JavaScript, launch actions, hostile field names | Parsing in workers, `isEvalSupported: false`, no scripting, no annotation layer, limits and timeouts, field names as text only, JavaScript stripped from output (§11.4) |
+| T3 | Hostile PDF | Exploit in a parser, font-compiler JavaScript (CVE-2024-4367), decompression bomb, PDF JavaScript, launch actions, hostile field names | Parsing in workers, no eval path in pdf.js 6, no scripting, no annotation layer, limits and timeouts, field names as text only, JavaScript stripped from output (§11.4) |
 | T4 | Script injection (XSS) | A field name, file name or snippet label reaches an HTML sink | React text nodes only, lint bans on HTML sinks, Trusted Types, strict CSP |
 | T5 | Tampered application code | Bucket or dependency compromise; with a service worker, a tampered build could also persist in visitors' caches | Same supply-chain and hosting controls as Mulligan; service worker update rules and a kill switch (§11.5, §11.6) |
 | T6 | Lookalike site | A modified copy that does upload documents | Not preventable; canonical domain, HSTS, About page shows build identity |
@@ -629,7 +642,7 @@ Font loading by pdf.js uses the `FontFace` API with binary data, which `font-src
 
 - **Header check and size cap** before parsing (§6.1). Maximum 50 MB and 2,000 pages.
 - **Parsing off the main thread.** pdf.js parses in its worker and pdf-lib in the pdf worker. Each call has a timeout (inspection 30 s, page render 20 s, export 60 s); on timeout the worker is terminated and replaced, and the user sees `pdf.damaged` or `export.failed`.
-- **No code execution from the document.** `isEvalSupported: false`; no pdf.js scripting sandbox is loaded (`enableScripting` is never set); no XFA HTML rendering; no annotation layer; no link following; embedded files are never opened.
+- **No code execution from the document.** pdf.js 6 has no eval path; no pdf.js scripting sandbox is loaded (`enableScripting` is never set); no XFA HTML rendering; no annotation layer; no link following; embedded files are never opened.
 - **Field names and values are data.** They are rendered as React text, looked up with `Object.hasOwn`, and length-capped for display (names at 200 characters, values at 10,000).
 - **Output hygiene.** Export removes document JavaScript and additional actions (§9.1 step 4). Embedded files and other content of the original are left as they were, since they are the sender's content and the recipient already has them.
 - **Signature uploads** are decoded by the browser and re-encoded (§8.2), with size and dimension caps.
@@ -639,7 +652,7 @@ Font loading by pdf.js uses the `FontFace` API with binary data, which `font-src
 
 Mulligan ships no service worker; Bogey needs one for S8, so it is written to keep the attack surface small:
 
-- `sw.ts` is built to `/sw.js` (unhashed, `Cache-Control: no-cache`) by a small Vite plugin that also injects the precache manifest: `index.html`, every hashed JS and CSS asset, both workers, the Liberation Sans fonts, `/pdfjs/standard_fonts/` and the pdf.js WASM files, with the build id as the cache name.
+- `sw.ts` is built to `/sw.js` (unhashed, `Cache-Control: no-cache`) by a small Vite plugin that also injects the precache manifest: `index.html`, every hashed JS and CSS asset, both workers, the Liberation Sans fonts, `/pdfjs/standard_fonts/`, `/pdfjs/wasm/` and `/pdfjs/iccs/`, with the build id as the cache name.
 - **Install** precaches the manifest. **Activate** deletes caches with other names. **Fetch** answers same-origin `GET`s from the cache first, falls back to the network, serves the cached `index.html` for navigations, and passes through everything else untouched. `/pdfjs/cmaps/` (about 1.5 MB, needed only for CJK documents) is cached at runtime on first use rather than precached, so a CJK document opened for the first time while offline will render with missing glyphs (§16).
 - **Updates** (B7): registration uses `updateViaCache: 'none'`, so the browser always checks `sw.js` against the network on navigation. A new worker waits; the app shows "A new version is ready. Reload to update." and on click posts `skipWaiting` to the waiting worker and reloads on `controllerchange`. Edits in progress are already saved, so the reload is safe.
 - **Kill switch**: `scripts/sw-kill.ts` produces a `sw.js` that unregisters itself and deletes its caches, for use if a bad or compromised build ever needs to be purged from visitors' browsers.
@@ -798,15 +811,21 @@ All six were confirmed by the maintainer on 2026-11-06.
 5. **CJK CMaps are cached on first use** rather than precached, so a first-time CJK document while offline may render with missing glyphs (§11.5).
 6. **Encrypted documents that the pdf-lib fork cannot decrypt** export as page images after a confirmation (§9.5).
 
-### 16.3 To be settled in Sprint 0 and Sprint 2
+### 16.3 Settled in Sprints 0–3
 
-1. The `@cantoo/pdf-lib` decryption matrix (§9.6), and in particular whether it handles AES-256 with owner-only passwords.
-2. The exact pinned versions of `pdfjs-dist` and `@cantoo/pdf-lib`; whether the pinned pdf.js uses WASM decoders (which decides `'wasm-unsafe-eval'`).
-3. Which widget kinds `AnnotationMode.ENABLE_FORMS` omits from the canvas in the pinned pdf.js version (§10.3).
-4. That pdf.js raises no Trusted Types violations in Chromium and Safari with the default policy (§11.3).
-5. Whether CloudFront's 304 responses carry the policy headers (carried over from Mulligan, where WebKit needed them on worker revalidation).
+1. Decryption: the fork handles the whole qpdf matrix, AES-256 owner-only included; mixed crypt filters fall back to page images (§9.6).
+2. Pinned versions: `pdfjs-dist` 6.5.438 and `@cantoo/pdf-lib` 2.11.1. pdf.js uses WASM decoders, so `'wasm-unsafe-eval'` stays (§10.3).
+3. `ENABLE_FORMS` behavior, with the canvas-map requirement and push-button redraw (§10.3).
+4. pdf.js raises no CSP or Trusted Types violations in any engine. WebKit itself raises a `style-src-attr` violation whenever a native `<select>` is created; how Sprint 5 handles this is an open decision (§16.4).
+5. CloudFront's 304 responses carry the policy headers; `check-live-headers.mjs` verifies it on every deploy.
+6. Hybrid XFA: inspection treats placed widgets without appearance streams as usable (the two pdfium static-XFA fixtures), and export generates the missing appearances. The fixture manifest labels hybrid files `formType: 'xfa'` with `xfa: 'hybrid'`; `inspectPdf` returns `acroform` for them as §6.2 says.
+7. pdf-lib logs "Failed to extract appearance ref" while flattening unchecked checkboxes that have only an on-state appearance (the IRS forms). Nothing is lost, since the page draws the empty box; checked boxes flatten correctly (verified on the W-9's "Other" and 3b boxes).
 
-### 16.4 Assumptions
+### 16.4 Open decisions
+
+1. **Native `<select>` in WebKit.** WebKit reports a `style-src-attr` violation for its own shadow tree whenever a `<select>` is created, which fails the E2E violation fixture. Sprint 1's zoom menu uses a menu button. Sprint 5's dropdown and list fields (§7.1) need either a narrow exception in the fixture for this one WebKit report (recommended: keeps the iPad's native picker and built-in accessibility, with no change to the real policy) or custom controls.
+
+### 16.5 Assumptions
 
 Confirmed 2026-11-06: domain `bogey.beta-site.us` and license GPL-3.0-or-later. Still open:
 
