@@ -28,6 +28,7 @@ pnpm test:coverage             # Vitest, merged coverage, thresholds 80% on all 
 pnpm test:e2e                  # Playwright against the production build
 pnpm gate                      # lint → test:coverage → test:browsers → build → test:e2e
 pnpm demo:export               # filled/overlaid exports of each fixture class into out/demo/ (fetch fixtures first for IRS/qpdf)
+pnpm screenshots               # README screenshots into docs/images/ (IRS W-9/W-4, imaginary taxpayer; needs fetched fixtures and cwebp)
 pnpm infra:deploy              # create/update the CloudFormation stack (infra/bogey.yaml)
 pnpm deploy:site               # gate, build, publish master to bogey.beta-site.us, check live headers
 

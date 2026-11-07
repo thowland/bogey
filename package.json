@@ -21,6 +21,7 @@
     "gate": "pnpm lint && pnpm test:coverage && pnpm test:browsers && pnpm build && pnpm test:e2e",
     "fixtures:make": "node tooling/scripts/make-fixtures.ts",
     "demo:export": "node tooling/scripts/demo-export.ts",
+    "screenshots": "pnpm build && playwright test --config tooling/screenshots/playwright.config.ts",
     "fixtures:fetch": "scripts/fetch-fixtures.sh",
     "infra:deploy": "scripts/infra-deploy.sh",
     "deploy:site": "scripts/deploy.sh"
