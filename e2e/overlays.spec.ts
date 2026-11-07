@@ -78,10 +78,9 @@ test('a flat PDF: place, move, resize, undo, redo and download @all-engines', as
   // Measured from where the check sits, not where it was clicked: font and pixel metrics move the
   // placed overlay by a fraction of a pixel between platforms.
   const before = centre((await check.boundingBox())!);
+  const checkOffBy = async (x: number) => Math.abs(centre((await check.boundingBox())!).x - x);
   await dragBy(page, before, 60, 0);
-  await expect
-    .poll(async () => Math.abs(centre((await check.boundingBox())!).x - (before.x + 60)))
-    .toBeLessThan(1);
+  await expect.poll(() => checkOffBy(before.x + 60)).toBeLessThan(1);
   await signature.click();
   const handle = page.getByTestId('resize-handle');
   await dragBy(page, centre((await handle.boundingBox())!), 80, 30);
@@ -95,9 +94,9 @@ test('a flat PDF: place, move, resize, undo, redo and download @all-engines', as
     .poll(async () => (await signature.boundingBox())!.width)
     .toBeCloseTo(placed.width, 0);
   await page.keyboard.press('ControlOrMeta+z');
-  await expect.poll(async () => centre((await check.boundingBox())!).x).toBeCloseTo(box.x + 100, 0);
+  await expect.poll(() => checkOffBy(before.x)).toBeLessThan(1);
   await page.keyboard.press('ControlOrMeta+Shift+z');
-  await expect.poll(async () => centre((await check.boundingBox())!).x).toBeCloseTo(box.x + 160, 0);
+  await expect.poll(() => checkOffBy(before.x + 60)).toBeLessThan(1);
 
   const file = await download(page, () =>
     page.getByRole('button', { name: 'Download', exact: true }).click(),
