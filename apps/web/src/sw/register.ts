@@ -70,8 +70,11 @@ export async function registerServiceWorker(host: UpdateHost): Promise<void> {
   let offered: WorkerLike | null = null;
   const offerWaiting = () => {
     const waiting = registration.waiting;
-    // Without a controller this is the first install, which activates by itself.
+    // Without a controller this is the first install, which activates by itself. Firefox can
+    // also report the first install's worker as both waiting and controller: with the page busy
+    // at load it delivers `controllerchange` before the worker's `installed` statechange.
     if (!waiting || waiting === offered || !container.controller) return;
+    if (container.controller === waiting) return;
     offered = waiting;
     host.offer(() => {
       container.addEventListener('controllerchange', reloadOnce, { once: true });
