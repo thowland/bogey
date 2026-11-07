@@ -198,9 +198,13 @@ test('field values and overlays come back after a reload (acceptance 3) @all-eng
   await expect
     .poll(async () => {
       const [saved] = await savedRecords(page);
-      return saved && { values: saved.fieldValues, overlays: saved.overlays.length };
+      return (
+        saved && { values: saved.fieldValues, overlays: saved.overlays.length, zoom: saved.zoom }
+      );
     })
-    .toEqual({ values: { text1: 'Ada Lovelace' }, overlays: 1 });
+    // The zoom too: without it a save from before the zoom change passes, and the reload then
+    // depends on a write started during pagehide, which a slow WebKit does not always finish.
+    .toEqual({ values: { text1: 'Ada Lovelace' }, overlays: 1, zoom: 1.5 });
 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Zoom level: 150%' })).toBeVisible();

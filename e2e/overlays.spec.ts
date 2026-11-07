@@ -75,8 +75,13 @@ test('a flat PDF: place, move, resize, undo, redo and download @all-engines', as
   const placed = (await signature.boundingBox())!;
 
   // Move the check 60 px right, then make the signature larger.
-  await dragBy(page, centre((await check.boundingBox())!), 60, 0);
-  await expect.poll(async () => centre((await check.boundingBox())!).x).toBeCloseTo(box.x + 160, 0);
+  // Measured from where the check sits, not where it was clicked: font and pixel metrics move the
+  // placed overlay by a fraction of a pixel between platforms.
+  const before = centre((await check.boundingBox())!);
+  await dragBy(page, before, 60, 0);
+  await expect
+    .poll(async () => Math.abs(centre((await check.boundingBox())!).x - (before.x + 60)))
+    .toBeLessThan(1);
   await signature.click();
   const handle = page.getByTestId('resize-handle');
   await dragBy(page, centre((await handle.boundingBox())!), 80, 30);
