@@ -149,7 +149,7 @@ The MVP is reached when S4 and S5 have both merged. It covers the spec's core pa
   - Playwright config serving the production build with the production headers; the CSP/Trusted Types violation fixture in `e2e/helpers.ts` (from Mulligan); one smoke spec.
   - Scripts: `dev`, `build`, `preview`, `lint`, `test`, `test:coverage`, `test:browsers`, `test:e2e`, `gate`.
   - `scripts/worktree.sh`, `scripts/ports.mjs` and `scripts/close-sprint.sh` (§1.1, §1.4, §1.5).
-  - `.github/workflows/ci.yml` running the gate (dormant until a remote exists).
+  - `.github/workflows/ci.yml` running the gate (live since the repository went public at github.com/thowland/bogey).
   - `tooling/test/boundaries.test.ts` proving each boundary rule rejects a planted violation.
 - **Security baseline** (spec §11.3): `apps/web/security/headers.json`; the `vite preview` middleware serving them on every response including 304s; `security/trustedTypes.ts` with the default policy for the two worker URLs and `/sw.js`; the dev-only relaxed CSP.
 - **Core contracts** (spec §4.1): all exported types (`Box`, `Point`, `PageGeometry`, `FieldDescriptor`, `FieldValues`, `Overlay`, `Edit`, `DocumentEditState`, `PdfInfo`, `ExportInput`, `ExportOutput`, `Problem` codes), `Result`, and the `TEXT` and date-format constants. No implementations beyond trivial helpers.

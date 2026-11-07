@@ -1,7 +1,6 @@
 # The same gate that every merge passes locally (CLAUDE.md, implementation plan §1.2): lint,
 # unit and browser tests with coverage, Firefox and WebKit runs, build, and end-to-end tests
 # against the production build with the production headers. Actions are pinned to commit SHAs.
-# Dormant until the repository has a remote (implementation plan §1.1).
 name: CI
 
 on:

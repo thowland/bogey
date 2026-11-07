@@ -8,6 +8,7 @@ import styles from './Page.module.css';
 export const CONTACT_EMAIL = 'th@wdogsystems.com';
 const LICENSE_URL = 'https://www.gnu.org/licenses/gpl-3.0.html';
 const MULLIGAN_URL = 'https://mulligan.beta-site.us';
+export const SOURCE_URL = 'https://github.com/thowland/bogey';
 
 export function AboutPage() {
   return (
@@ -39,9 +40,10 @@ export function AboutPage() {
         <p>
           Bogey is free software: you can redistribute it and change it under the terms of the{' '}
           <a href={LICENSE_URL}>GNU General Public License</a>, version 3 or later. It comes with no
-          warranty. The complete source code is available from the author at the address above. It
-          uses pdf.js from Mozilla to show documents and pdf-lib to write them, both under their own
-          open-source licenses, and the Liberation Sans font under the SIL Open Font License.
+          warranty. The complete source code is at{' '}
+          <a href={SOURCE_URL}>{SOURCE_URL.replace('https://', '')}</a>. It uses pdf.js from Mozilla
+          to show documents and pdf-lib to write them, both under their own open-source licenses,
+          and the Liberation Sans font under the SIL Open Font License.
         </p>
       </Section>
 
