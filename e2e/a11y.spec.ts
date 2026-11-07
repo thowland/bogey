@@ -78,7 +78,10 @@ test('a document with fields and overlays, and every panel tab @all-engines', as
 
   const { box } = await pageArea(page);
   await page.getByRole('group', { name: 'Tools' }).getByRole('button', { name: /^Text/ }).click();
-  await page.mouse.click(box.x + 420, box.y + 60);
+  // In the left margin, clear of every field: a text overlay is as small as its text, and axe
+  // passes a small target only with clear space around it (WCAG 2.5.8). Near a field, Linux font
+  // metrics closed the gap.
+  await page.mouse.click(box.x + 20, box.y + 60);
   await page.keyboard.type('Signed in Boston');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Place Mine' }).click();
