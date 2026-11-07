@@ -6,12 +6,17 @@
 // every click on the page, and a tap places the tool's overlay. A tap is one pointer, pressed and
 // released within 6 CSS px and 400 ms; a pan, or a second finger joining (a pinch), places
 // nothing (spec §7.2).
+//
+// The keyboard path (U4, spec §13): while a placement tool is chosen, a "Place here" button marks
+// where the overlay will go (the last point clicked on this page, or near the top-left corner) and
+// takes focus, so Enter places it; focus then moves to the new overlay, where the arrow keys nudge
+// it and Delete removes it.
 import { useEffect, useRef, type PointerEvent, type RefObject } from 'react';
 import { useDocumentStore } from '../../state/document.ts';
 import { useEditsStore } from '../../state/edits.ts';
 import { useViewStore } from '../../state/view.ts';
-import { placeAt } from './actions.ts';
-import { isTap, pagePoint, type PointerSample } from './model.ts';
+import { TOOL_NAMES, placeAt } from './actions.ts';
+import { isTap, keyboardPoint, pagePoint, type PointerSample } from './model.ts';
 import { OverlayItem } from './OverlayItem.tsx';
 import { useOverlayUi } from './overlayUi.ts';
 import styles from './Overlays.module.css';
@@ -28,8 +33,36 @@ export function OverlayLayer() {
   const root = useRef<HTMLDivElement>(null);
   const down = useRef<(PointerSample & { id: number }) | null>(null);
   const pressed = useRef(new Set<number>());
+  const placeHere = useRef<HTMLButtonElement>(null);
+  const focusPlaced = useRef(false);
+  const placing = tool !== 'select';
+  const lastPoint = useViewStore((state) => state.lastPoint);
 
   useLastPoint(root, geometry !== undefined && zoom !== null);
+
+  // A placement tool moves focus to the marker; a keyboard placement moves it on to the overlay.
+  // Leaving the tool without placing (Escape, V) returns focus to where it was before.
+  const returnTo = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (placing) {
+      const before = document.activeElement;
+      if (before instanceof HTMLElement && before !== placeHere.current) returnTo.current = before;
+      placeHere.current?.focus({ preventScroll: true });
+      return;
+    }
+    const previous = returnTo.current;
+    returnTo.current = null;
+    if (!focusPlaced.current) {
+      if (document.activeElement === document.body && previous?.isConnected) previous.focus();
+      return;
+    }
+    focusPlaced.current = false;
+    const id = useViewStore.getState().selectedOverlayId;
+    const item = [...(root.current?.querySelectorAll<HTMLElement>('[data-overlay-id]') ?? [])].find(
+      (element) => element.dataset.overlayId === id,
+    );
+    item?.querySelector<HTMLElement>('button, textarea')?.focus();
+  }, [placing, tool]);
 
   if (!geometry || zoom === null) return null;
 
@@ -38,7 +71,6 @@ export function OverlayLayer() {
     return { x: event.clientX - box.left, y: event.clientY - box.top, t: event.timeStamp };
   };
 
-  const placing = tool !== 'select';
   const shown = overlays.filter((o) => o.page === pageIndex);
   if (draft && draft.page === pageIndex && !shown.some((o) => o.id === draft.id)) shown.push(draft);
 
@@ -79,6 +111,17 @@ export function OverlayLayer() {
         down.current = null;
       }}
     >
+      {placing && (
+        <PlaceHere
+          ref={placeHere}
+          at={keyboardPoint(geometry, zoom, lastPoint?.page === pageIndex ? lastPoint.point : null)}
+          label={`Place ${TOOL_NAMES[tool].toLowerCase()} here`}
+          onPlace={(at) => {
+            focusPlaced.current = true;
+            placeAt(at, zoom);
+          }}
+        />
+      )}
       {shown.map((overlay) => (
         <OverlayItem
           key={overlay.id}
@@ -90,6 +133,37 @@ export function OverlayLayer() {
         />
       ))}
     </div>
+  );
+}
+
+/**
+ * The keyboard's placement point, marked on the page. It takes no pointer events: a click on the
+ * page places where it lands, as before.
+ */
+function PlaceHere({
+  ref,
+  at,
+  label,
+  onPlace,
+}: {
+  ref: RefObject<HTMLButtonElement | null>;
+  at: { x: number; y: number };
+  label: string;
+  onPlace(at: { x: number; y: number }): void;
+}) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={styles.placeHere}
+      style={{ left: at.x, top: at.y }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onPlace(at);
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

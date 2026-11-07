@@ -145,7 +145,8 @@
 }
 
 .remove {
-  --hit: 20px;
+  /* WCAG 2.2 target size (2.5.8): at least 24 × 24 CSS px; 44 px on touch screens below. */
+  --hit: 24px;
   position: absolute;
   top: calc(var(--hit) * -1 - 4px);
   right: -3px;
@@ -169,4 +170,34 @@
   .remove {
     --hit: 44px;
   }
+}
+
+/* The keyboard placement marker (U4): hidden until it has keyboard focus, then a crosshair at the
+   point with its label beside it. */
+.placeHere {
+  position: absolute;
+  z-index: 2;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.placeHere:focus-visible {
+  width: auto;
+  height: auto;
+  padding: 2px var(--space-2) 2px 14px;
+  overflow: visible;
+  clip-path: none;
+  border: 2px solid var(--focus);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text);
+  background: var(--surface);
+  transform: translate(-7px, -50%);
 }

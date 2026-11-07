@@ -29,11 +29,26 @@
   list-style: none;
 }
 
+/* A snippet's value is drawn inside its button's border, under the label, but is not part of the
+   button (its name stays the label alone); clicks on it reach the button underneath. */
+.item {
+  position: relative;
+}
+
+.item .value {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-2);
+  left: calc(var(--space-3) + 1px);
+  pointer-events: none;
+}
+
 .snippet {
   display: grid;
   width: 100%;
   gap: 2px;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3) calc(var(--space-2) + 2px + var(--text-xs) * 1.5)
+    var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   font: inherit;
@@ -79,9 +94,12 @@
   background: var(--surface);
 }
 
-.row[data-dragging] {
+.editItem[data-dragging] {
   position: relative;
   z-index: 1;
+}
+
+.editItem[data-dragging] > .row {
   box-shadow: var(--page-shadow);
 }
 

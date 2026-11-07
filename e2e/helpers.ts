@@ -787,3 +787,57 @@ export async function activeContent(bytes: Uint8Array): Promise<string[]> {
   visit(doc.context.trailerInfo.Info, 'Info');
   return found;
 }
+
+// ── release (Sprint 10) ──
+
+/**
+ * Draws a signature with synthetic Apple Pencil events (`pointerType: 'pen'`, pressure rising
+ * along the stroke) in the draw dialog, and saves it under `name` (G2, G3, acceptance 1).
+ */
+export async function drawPenSignature(page: Page, name: string): Promise<void> {
+  const panel = page.getByRole('complementary', { name: /fields, snippets and signatures/i });
+  await panel.getByRole('tab', { name: 'Signatures' }).click();
+  await panel.getByRole('button', { name: 'Draw' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Draw a signature' });
+  await dialog.getByRole('img', { name: 'Signature drawing area' }).evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const points = Array.from({ length: 24 }, (_, i) => [
+      60 + i * 14,
+      rect.height * (0.55 + 0.25 * Math.sin(i / 2)),
+    ]);
+    points.forEach(([x, y], i) =>
+      element.dispatchEvent(
+        new PointerEvent(i === 0 ? 'pointerdown' : 'pointermove', {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 9,
+          pointerType: 'pen',
+          isPrimary: true,
+          clientX: rect.left + x!,
+          clientY: rect.top + y!,
+          pressure: 0.15 + (0.8 * i) / points.length,
+          buttons: 1,
+          button: i === 0 ? 0 : -1,
+        }),
+      ),
+    );
+    const [x, y] = points.at(-1)!;
+    element.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 9,
+        pointerType: 'pen',
+        isPrimary: true,
+        clientX: rect.left + x!,
+        clientY: rect.top + y!,
+        pressure: 0,
+        buttons: 0,
+        button: 0,
+      }),
+    );
+  });
+  await dialog.getByRole('textbox', { name: 'Name' }).fill(name);
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+}

@@ -12,7 +12,7 @@ Bogey is a browser-only PDF fill-and-sign tool: open a PDF, fill its form fields
 
 ## Status
 
-Waves 0–3 are merged (tags `sprint-00` to `sprint-09`): the full v1 feature set is live, including snippets and settings, touch and iPad gestures, offline use through the service worker, and the security suite. Sprint 10 (release: Help/About/Privacy, accessibility, performance, acceptance on Mac and iPad) is next. Update this section as sprints land.
+All eleven sprints are merged (tags `sprint-00` to `sprint-10`): v1.0.0 is feature-complete, with Help, About and Privacy written, an axe pass with no violations, and the automated acceptance tests passing in all three engines (`CHANGELOG.md`). The `v1.0.0` tag waits for the maintainer's device acceptance in `docs/manual-acceptance.md` (Mac, iPad, VoiceOver). Later work goes on `fix/…` and `feature/…` branches; the backlog is spec §15.3.
 
 ## Commands
 
@@ -43,7 +43,7 @@ pnpm exec vitest run --project core:node -t "unique"                  # one test
 pnpm exec playwright test smoke --project webkit                      # one E2E spec (needs pnpm build)
 ```
 
-E2E runs against the production build via `vite preview`. Concurrent sessions share the scratchpad, so name logs per sprint (`gate-sprint-NN.log`). iPad review uses the deployed site: plain HTTP over the LAN lacks `crypto.randomUUID`. Ports come from `scripts/ports.mjs`, derived from the checkout path, so worktrees can run the gate at the same time (main checkout: preview 4173, E2E 4174). Chromium runs every spec; Firefox and WebKit run specs whose title contains `@all-engines`. Every E2E test fails on any CSP or Trusted Types violation or page error (fixture in `e2e/helpers.ts`); the expected-fail self-test in `e2e/security.spec.ts` shows as ✘ but counts as passing.
+E2E runs against the production build via `vite preview`. `e2e/a11y.spec.ts` runs axe (WCAG 2.2 AA) on every screen and dialog and fails on any violation, so a new screen or dialog gets a scan there; `e2e/acceptance.spec.ts` maps requirements §15 to the specs that cover it and holds the E7 budget test. Concurrent sessions share the scratchpad, so name logs per sprint (`gate-sprint-NN.log`). iPad review uses the deployed site: plain HTTP over the LAN lacks `crypto.randomUUID`. Ports come from `scripts/ports.mjs`, derived from the checkout path, so worktrees can run the gate at the same time (main checkout: preview 4173, E2E 4174). Chromium runs every spec; Firefox and WebKit run specs whose title contains `@all-engines`. Every E2E test fails on any CSP or Trusted Types violation or page error (fixture in `e2e/helpers.ts`); the expected-fail self-test in `e2e/security.spec.ts` shows as ✘ but counts as passing.
 
 ## Workflow rules
 
@@ -72,6 +72,7 @@ E2E runs against the production build via `vite preview`. Concurrent sessions sh
   - App limits live in `src/config.ts`; problem codes and their user text in `src/ui/messages.ts`.
 - The pdf-lib fork deletes a document's XFA whenever `getForm()` runs (saving included) unless loaded with `preserveXFA: true`.
 - Browser-mode tests: list every package they import in `vitest.config.ts` (`CORE_BROWSER_DEPS` / `WEB_BROWSER_DEPS`), or Vite re-optimizes mid-run on a cold cache and the post-merge gate fails. Tests under the E2E violation fixture take no screenshots (WebKit reports Playwright's injected style).
+- Keyboard: choosing a placement tool focuses a "Place … here" marker in the overlay layer, and Enter places there; focus then moves to the new overlay. In WebKit, Tab skips buttons and checkboxes unless Safari's "Press Tab to highlight each item" is on, so keyboard E2E tests press Alt+Tab there.
 - Native controls are preferred. WebKit reports a `style-src-attr` violation for its own `<select>` internals; the E2E fixture ignores exactly that report (spec §16.4), so use `<select>` freely, and never set inline style attributes (React `style` props go through the CSSOM and are fine).
 - Coordinates: overlays store an anchor in unrotated PDF points and dimensions in the upright (as-viewed) frame; export draws with `rotate = page /Rotate` (spec §5.3).
 
@@ -82,7 +83,7 @@ The site is public with no backend; documents, signatures and snippets never lea
 - Production headers are defined once in `apps/web/security/headers.json`: CSP with `connect-src 'self'` (pdf.js assets and the service worker only), `script-src 'self' 'wasm-unsafe-eval'`, no inline styles, Trusted Types with a `default` policy allowing only the two worker URLs and `/sw.js`, plus COOP/COEP/CORP. `vite preview` serves them minus HSTS and `upgrade-insecure-requests`, on every response including 304s.
 - CloudFront allows only `GET`/`HEAD`, with access logging off.
 - ESLint bans `fetch`, XHR, WebSocket, EventSource, `sendBeacon`, `location.search`/`location.hash`, `message` listeners on `window`, `window.open`/`opener`, and HTML sinks (`innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `dangerouslySetInnerHTML`). `src/sw/sw.ts` is the one file allowed to fetch.
-- pdf.js runs with `isEvalSupported: false`, no scripting, no XFA rendering and no annotation layer. Field names, values, file names and snippet labels are rendered as text only and looked up with `Object.hasOwn` or `Map`.
+- pdf.js 6 has no eval path (no `isEvalSupported` option; spec §10.3) and runs with no scripting, no XFA rendering and no annotation layer. Field names, values, file names and snippet labels are rendered as text only and looked up with `Object.hasOwn` or `Map`.
 - Input arrives only through user gestures (drop, file picker, typing, the signature canvas, snippet import). There is no URL-driven state.
 - Export strips document JavaScript and additional actions and saves unencrypted. Passwords are never persisted.
 - The service worker (`src/sw/`, built to an unhashed `/sw.js` by `plugins/serviceWorker.ts`) precaches the build and serves it offline; a new build waits until the user accepts the update toast. **Kill switch**, for a bad or compromised build in visitors' caches: on master, `pnpm build`, then `node scripts/sw-kill.ts` (overwrites `apps/web/dist/sw.js` with a worker that deletes every cache and unregisters itself), then publish only that file with the stack outputs `BucketName` and `DistributionId` (the AWS profile from `deploy.env`): `aws s3 cp apps/web/dist/sw.js s3://$BUCKET/sw.js --cache-control no-cache --content-type text/javascript` and `aws cloudfront create-invalidation --distribution-id $DIST_ID --paths /sw.js`. `node scripts/check-live-headers.mjs` accepts the kill switch. Visitors' browsers pick it up on their next visit. A normal `pnpm deploy:site` of the fixed build replaces it.

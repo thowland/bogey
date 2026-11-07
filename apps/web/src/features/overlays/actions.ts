@@ -52,7 +52,9 @@ export function chooseTool(tool: Tool): void {
     view.setTool(tool);
   }
   ui.announce(
-    tool === 'select' ? 'Select tool' : `${TOOL_NAMES[tool]} tool: click the page to place it`,
+    tool === 'select'
+      ? 'Select tool'
+      : `${TOOL_NAMES[tool]} tool: click the page to place it, or press Enter to place it at the marker`,
   );
 }
 
@@ -171,7 +173,15 @@ export function setSize(overlay: Overlay, size: number): void {
 }
 
 export function deleteOverlay(id: string): void {
+  // Focus inside the overlay would fall to <body> with it, so it moves to the Select tool (U4).
+  const focused = document.activeElement;
+  const hadFocus =
+    focused instanceof HTMLElement &&
+    focused.closest('[data-overlay-id]')?.getAttribute('data-overlay-id') === id;
   useEditsStore.getState().edit({ type: 'deleteOverlay', id });
+  if (hadFocus) {
+    document.querySelector<HTMLElement>('[role="group"][aria-label="Tools"] button')?.focus();
+  }
   if (useViewStore.getState().selectedOverlayId === id) useViewStore.getState().select(null);
   useOverlayUi.getState().announce('Overlay deleted');
 }

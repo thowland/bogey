@@ -268,6 +268,9 @@ async function buildAcroForm(): Promise<PDFDocument> {
   const multiline = form.createTextField('multiline1');
   multiline.enableMultiline();
   multiline.addToPage(page, { x: 180, y: 580, width: 300, height: 60, font });
+  // pdf-lib sizes text to fit a field with no size of its own, which gave 51 pt here; 10 pt is
+  // what a real form would use (implementation plan §4).
+  multiline.setFontSize(10);
 
   label('comb1 (9)', 540);
   const comb = form.createTextField('comb1');
