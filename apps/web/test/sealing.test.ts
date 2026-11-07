@@ -391,14 +391,16 @@ describe('a document opened before storage was ready', () => {
     useStorageStore.getState().attach(repository);
     const controller = createSessionController({ repository });
     controller.start();
-    for (let i = 0; i < 8; i++) {
+    // The catch-up save is a chain of IndexedDB requests, and fake-indexeddb answers each on a
+    // macrotask of its own, so how many turns it takes depends on load: wait for the result
+    // rather than counting turns (a fixed count failed under a busy gate).
+    await vi.waitFor(async () => {
       await repository.flush();
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-    expect(await repository.get('documentBytes', 'early')).toBeDefined();
-    expect(await repository.get('documents', 'early')).toMatchObject({
-      pageCount: 2,
-      fieldValues: EDITS.fieldValues,
+      expect(await repository.get('documentBytes', 'early')).toBeDefined();
+      expect(await repository.get('documents', 'early')).toMatchObject({
+        pageCount: 2,
+        fieldValues: EDITS.fieldValues,
+      });
     });
     expect(useSessionStore.getState().deferred).toBeNull();
     controller.stop();
