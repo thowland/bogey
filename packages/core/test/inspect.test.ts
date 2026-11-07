@@ -93,6 +93,7 @@ describe('inspectPdf', () => {
     expect(inherited.pages[0]).toMatchObject({ rotate: 90, userUnit: 2 });
   });
 
+  // Five pure-JS key derivations: a few seconds on a laptop, about 18 s on a two-core CI runner.
   it('handles passwords (D3)', async () => {
     const bytes = await makeForm({ encrypt: { user: 'secret', owner: 'owner' } });
     expect(await inspectPdf(bytes)).toEqual({
@@ -111,7 +112,7 @@ describe('inspectPdf', () => {
     expect(info).toMatchObject({ encrypted: true, decryptable: true, formType: 'acroform' });
     const ownerOnly = await inspectOk(await makeForm({ encrypt: { owner: 'owner' } }));
     expect(ownerOnly).toMatchObject({ encrypted: true, decryptable: true });
-  });
+  }, 60_000);
 
   it('refuses non-PDF and damaged input', async () => {
     expect(hasPdfHeader(new TextEncoder().encode('junk\n%PDF-1.7'))).toBe(true);
