@@ -242,6 +242,19 @@ describe('registration and updates (B7)', () => {
     expect(host.reload).not.toHaveBeenCalled();
   });
 
+  it('does not offer the first install when Firefox reports it as controller before installed', async () => {
+    const { worker, registration, container, host, offers } = fakes({ controlled: false });
+    await registerServiceWorker(host);
+    const first = worker('installing');
+    registration.installing = first;
+    registration.updatefound();
+    container.controller = first; // claimed, and controllerchange already delivered
+    registration.waiting = first;
+    first.become('installed'); // the late statechange
+    expect(offers).toHaveLength(0);
+    expect(host.reload).not.toHaveBeenCalled();
+  });
+
   it('reloads a controlled page once when another tab accepts the update', async () => {
     const { container, host } = fakes({ controlled: true });
     await registerServiceWorker(host);
