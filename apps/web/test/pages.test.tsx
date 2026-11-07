@@ -64,6 +64,10 @@ describe('About', () => {
       'href',
       'https://www.gnu.org/licenses/gpl-3.0.html',
     );
+    expect(screen.getByRole('link', { name: 'github.com/thowland/bogey' })).toHaveAttribute(
+      'href',
+      'https://github.com/thowland/bogey',
+    );
     expect(screen.getByRole('link', { name: 'Mulligan' })).toBeVisible();
     expect(screen.getByRole('region', { name: 'Author and contact' })).toHaveTextContent(
       'Tim Howland',

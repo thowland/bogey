@@ -14,6 +14,8 @@ Bogey is a browser-only PDF fill-and-sign tool: open a PDF, fill its form fields
 
 All eleven sprints are merged (tags `sprint-00` to `sprint-10`): v1.0.0 is feature-complete, with Help, About and Privacy written, an axe pass with no violations, and the automated acceptance tests passing in all three engines (`CHANGELOG.md`). The `v1.0.0` tag waits for the maintainer's device acceptance in `docs/manual-acceptance.md` (Mac, iPad, VoiceOver). Later work goes on `fix/…` and `feature/…` branches; the backlog is spec §15.3.
 
+The public repository is <https://github.com/thowland/bogey> (remote `origin`). After a merge to master, push master and any new tag (`git push origin master --tags`); CI (`.github/workflows/ci.yml`) runs the gate on pushes to master and on pull requests, and does not deploy.
+
 ## Commands
 
 pnpm workspace, Node 22+. First run needs `pnpm exec playwright install chromium firefox webkit`; regenerating fixtures needs `qpdf` (`brew install qpdf`).
