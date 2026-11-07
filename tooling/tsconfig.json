@@ -4,5 +4,12 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["test", "../e2e", "../playwright.config.ts", "../vitest.config.ts", "../scripts"]
+  "include": [
+    "test",
+    "screenshots",
+    "../e2e",
+    "../playwright.config.ts",
+    "../vitest.config.ts",
+    "../scripts"
+  ]
 }

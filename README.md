@@ -6,6 +6,28 @@ It is a companion to [Mulligan](../mulligan), built the same way and with the sa
 
 Bogey runs at <https://bogey.beta-site.us>. There are no accounts and nothing to install.
 
+## Filling in a W-9
+
+The screenshots here use the IRS Form W-9 and Form W-4, filled in for Marisol J. Quintero, who runs a letterpress shop in Vermont. She, her shop, her client and her employer are made up; her Social Security number, 987-65-4321, comes from the block the Social Security Administration reserves for advertising, her phone number is in the 555-01xx range set aside for fiction, and her email address is on a domain reserved for examples.
+
+![The W-9 open in Bogey, with lines 1 to 6 filled in and the Snippets panel showing Marisol's name and address](docs/images/w9-fields.webp)
+
+Opening the W-9 puts an HTML control over each of its fields, so typing into line 1 works the way typing into any web form does, and the checkbox for an individual or sole proprietor is a real checkbox. The Snippets panel on the right holds the details that go on most forms, saved once in the browser; with a field focused, clicking a snippet fills it, which is how lines 1, 5 and 6 were filled here. The panel names the field a snippet will fill, and since the IRS gives its fields internal names such as `f1_08[0]` and no labels, that is the name Bogey shows.
+
+![The Draw a signature dialog, with a signature drawn in the box and the name Marisol entered](docs/images/draw-signature.webp)
+
+A signature is drawn once, with a mouse, a finger or an Apple Pencil, whose pressure sets the width of the line, or uploaded as a photo of a signature on paper, which Bogey separates from the paper. It is saved in the browser under a name and used again on every form after.
+
+![Part II of the W-9, with the SSN in its boxes, Marisol's signature on the signature line and today's date beside it](docs/images/w9-signed.webp)
+
+The Social Security number goes into the comb fields one digit per box. Placing the signature takes two clicks, one on the signature in the Signatures panel and one where it should go on the page, and pressing D and clicking puts today's date beside it. Download then writes the values, the signature and the date into the page, flattens the form so the recipient cannot change it, and saves `fw9-signed.pdf`.
+
+## On an iPad
+
+![The W-4 on an iPad in landscape, with the employer's section filled in and Marisol's signature and the date in Step 5](docs/images/w4-ipad.webp)
+
+The same site runs on an iPad, where the toolbar wraps onto two rows and the Pencil draws signatures with pressure. This screenshot comes from Playwright's emulation of an 11-inch iPad Pro in WebKit; `docs/ipad-checklist.md` covers the checks made on a real one. The W-4's start date and employer identification number are left empty here because the form places those two fields across its own bottom rule, so anything typed into them sits on the page footer, in Acrobat as in Bogey.
+
 ## What it does
 
 - **Opening.** Drop a PDF or choose it from the file picker, up to 50 MB and 2,000 pages, password-protected files included. The last 20 documents stay in a recent list, and a reload or a closed tab brings back the document, its page and zoom, and everything typed into it.
@@ -50,6 +72,8 @@ Day to day:
 pnpm dev                     # dev server, with a relaxed CSP so hot reload works
 pnpm build && pnpm preview   # the production build, served with the production headers
 ```
+
+To regenerate the screenshots in `docs/images/` after a change to the interface, run `pnpm screenshots`. It needs the fetched IRS forms and `cwebp` (`brew install webp`), and it drives the production build through `tooling/screenshots/readme.shots.ts`.
 
 The preview port comes from `scripts/ports.mjs`, which derives it from the checkout's path, so two worktrees can run at once.
 
